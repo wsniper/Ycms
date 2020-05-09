@@ -1,2 +1,2 @@
 from . import config
-from .config import DB
+from .config import (DB, URL)
