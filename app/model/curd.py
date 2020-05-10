@@ -5,20 +5,25 @@ from sqlalchemy import text
 from ..exc import YcmsTableNotExistsError
 from ..schema import TABLES
 
-def create(data):
+def create(data, bulk_insert=True):
     """ 添加数据
 
         这里不做任何验证，直接使用数据入库。
         验证由调用者处理。
-        data: {
-            table_a: [
-                {field_a: va, field_b: vb...}
-            ],
-            table_b: [
-                {field_a: va, field_b: vb...}
-            ],
-            ...
-        }
+
+        :param data: 需要插入的数据
+            eg: {
+                table_a: [
+                    {field_a: va, field_b: vb...}
+                ],
+                table_b: [
+                    {field_a: va, field_b: vb...}
+                ],
+                ...
+            }
+        :param bulk_insert: 默认True 是否使用 sqlalchemy::session::bulk_insert_mappings
+            False: 逐条数据执行 insert
+            True： 类似 insert ... values((...), (...)) 更有效率。
     """
     dbsess = get_dbsess()
     try:
@@ -26,11 +31,17 @@ def create(data):
             t_schema = TABLES.get(table_name)
             if not t_schema:
                 raise YcmsTableNotExistsError(None, 'app.schema.' + table_name)
-            dbsess.add_all([t_schema(**value) for value in values])
+            if bulk_insert: 
+                if values:
+                    dbsess.bulk_insert_mappings(t_schema, values)
+            else:
+                values = [t_schema(**value) for value in values]
+                if values:
+                    dbsess.add_all(values)
         dbsess.commit()
     except (sqlalchemy.exc.SQLAlchemyError, KeyError) as e:
         dbsess.rollback()
         raise e
-    return dbsess
+    return dbsess, t_schema
 
 

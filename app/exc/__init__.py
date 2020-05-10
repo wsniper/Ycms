@@ -1,8 +1,6 @@
 """ Ycms 异常
 """
 
-from ..conf import EXC
-
 
 class YcmsError(Exception):
     def __init__(self, message, data, logit=False):
