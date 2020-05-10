@@ -3,4 +3,4 @@ from .tables.table_user import User
 
 
 # 用于遍历使用
-TABLES = (User, )
+TABLES = {'user': User}

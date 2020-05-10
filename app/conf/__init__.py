@@ -1,2 +1,2 @@
-from . import config
-from .config import (DB, URL)
+from . import config 
+from .config import (DB, URL, APP, LOGGING)
