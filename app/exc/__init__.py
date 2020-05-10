@@ -22,3 +22,22 @@ class YcmsTableNotExistsError(YcmsError):
         message = message or '待操作的数据表不存在: ' + str(data)
         super().__init__(message, data, logit)
 
+
+class YcmsSqlParseError(YcmsError):
+    """ 解析sql失败
+    """
+    def __init__(self, message, data, logit=False):
+        message = message or '解析sql失败 ' + str(data)
+        super().__init__(message, data, logit)
+
+
+class YcmsSqlOperatorError(YcmsSqlParseError):
+    def __init__(self, message, data, logit=False):
+        message = message or '非法sql操作符 ' + str(data)
+        super().__init__(message, data, logit)
+
+
+class YcmsSqlConditionParseError(YcmsSqlParseError):
+    def __init__(self, message, data, logit=False):
+        message = message or '非法sql条件 ' + str(data)
+        super().__init__(message, data, logit)
