@@ -10,16 +10,16 @@ from app.schema import TABLES
 def data():
     d = {
         'where': [
-            [('_@$@_user.name_@$@_', 'eq', 9), ('_@$@_user.id_@$@_', 'gt', '22')],
-            [('_@$@_user.name_@$@_', 'like', '%ab%'), ('_@$@_user.id_@$@_', 'le', '23'), ('_@$@_user.id_@$@_', 'lt', '23')],
-            [('_@$@_user.name_@$@_', 'like', '%ab%'), ('_@$@_user.id_@$@_', 'in', '2_@$@_5_@$@_3'), ('_@$@_user.id_@$@_', 'lt', '23')],
-            [('_@$@_user.name_@$@_', 'between', 'aa_@$@_bb'), ('_@$@_user.id_@$@_', 'ge', '6'), ('_@$@_user.id_@$@_', 'neq', '7')],
+            [('user.name', 'eq', 9), ('user.id', 'gt', '22')],
+            [('user.name', 'like', '%ab%'), ('user.id', 'le', '23'), ('user.id', 'lt', '23')],
+            [('user.name', 'like', '%ab%'), ('user.id', 'in', '2_@$@_5_@$@_3'), ('user.id', 'lt', '23')],
+            [('user.name', 'between', 'aa_@$@_bb'), ('user.id', 'ge', '_@$@_user.password_@$@_'), ('user.id', 'neq', '7')],
         ],
         'order_by': [
-            ('_@$@_user.name_@$@_', 'desc'),
-            # ('_@$@_user.id_@$@_', 'desc'),
-            ('_@$@_user.add_time_@$@_', 'desc'),
-            ('_@$@_user.last_update_time_@$@_', 'asc')
+            ('user.name', 'desc'),
+            # ('user.id', 'desc'),
+            ('user.add_time', 'desc'),
+            ('user.last_update_time', 'asc')
         ],
         'group_by': 'user.last_update_time$avg|user.id,sum|user.add_time,count|user.id',
         'fields': ['user.name', 'user.id', 'user.add_time']
@@ -32,7 +32,10 @@ def test_parse_condition(data):
     """
     pc = ParseCondition(data['where'], TABLES['user'])
     stm = pc.parse()
+    print('\n********************** where ***************************')
     print(stm)
+    print(pc.params)
+    print('********************** where ***************************')
 
 
 ## order by
