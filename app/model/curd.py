@@ -1,6 +1,5 @@
 from ..db import get_dbsess
 import sqlalchemy
-from sqlalchemy import text, or_, and_
 
 from ..import exc  
 from ..schema import TABLES
