@@ -1,6 +1,5 @@
 """ 解析 where子句的dict定义
 
-
     :param where: where子句的定义 dict格式
 
     where f > 1 and f2<2 or f3 like '%..%' and f4 in (...) and f5 between 
@@ -20,23 +19,31 @@ from ..logger import dlogger
 
 
 class ParseSqlMixIn:
-    def get_map_attr_or_val(self, string, is_table=False):
-        """ 解析
+    def get_map_attr_or_val(self, val, is_table=False, parse_field_with_no_flag_char=False):
+        """ 将val 解析为数据库字段（返回值第二个布尔值标示）或普通字符串
+
+            :param parse_field_with_no_flag_char: 不带_@$@_也按照字段名解析
             _@$@_tablename.field_name_@$@_
         """
-        string = str(string)
-        rs = (''.join(['"', string, '"']), False)
+        val = str(val)
+        rs = (''.join(['"', val, '"']), False)
         t_map = None
         t_map_f = None
-        if string.count('.') == 1 and string.startswith('_@$@_') and string.endswith('_@$@_'):
-            t_name, f_name = string.replace('_@$@_', '').split('.')
+        if (val.count('.') == 1 and val.startswith('_@$@_') and 
+                                    val.endswith('_@$@_') or parse_field_with_no_flag_char):
+            t_name, f_name = val.replace('_@$@_', '').split('.')
             t_map = TABLES.get(t_name, None)
-            t_map_f = getattr(t_map, f_name)
+            try:
+                t_map_f = getattr(t_map, f_name)
+            except AttributeError as e:
+                raise exc.YcmsSqlConditionParseError('字段不存在 <' + t_name + '.' + f_name + '>')
+
         if all([t_map, t_map_f]):
             rs = ('.'.join([t_name, f_name]), True)
         elif is_table:
-            raise exc.YcmsSqlConditionParseError(string)
+            raise exc.YcmsSqlConditionParseError(val)
         return rs
+
 
 class ParseCondition(ParseSqlMixIn):
 
@@ -45,7 +52,8 @@ class ParseCondition(ParseSqlMixIn):
 
             仅实现了下面 op_white_list中的操作符/关键字
             
-            TODO 优化查询性能，将有索引的字段条件放到最前面
+            # TODO 优化查询性能，将有索引的字段条件放到最前面
+            # TODO 需要可以从多个TableMap 操作 现在只能从指定的“单表”操作。
 
             专用分隔符：_@$@_
                 in/not in/exists/not exists/between中的逗号使用该分隔符代替
@@ -191,11 +199,6 @@ class ParseCondition(ParseSqlMixIn):
         """
         return text(' not exists '.join(self._parse_one(tuple_arg)))
 
-    def parse_order_by(self, tuple_arg):
-        """ 
-            :param tuple_arg: eg: [('_@$@_user.name_@$@_', 'asc'),('_@$@_user.id_@$@_', 'desc')]
-        """
-
 
 class ParseOrderby(ParseSqlMixIn):
     """ 解析orderby
@@ -221,26 +224,70 @@ class ParseOrderby(ParseSqlMixIn):
 
 class ParseFields(ParseSqlMixIn):
     """ 解析 需要操作的字段
+
+        get_map_attr_or_val() 来确保 是真实字段
+        :return: text('f, f, f, f')
     """
     def __init__(self, src, table_map):
-        pass
+        self.src = src
+        self.table_map = table_map
+
+    def parse(self):
+        rs = []
+        for item in self.src:
+            field = self.get_map_attr_or_val(item, True, True)
+            rs.append(field[0])
+        return text(', '.join(rs))
 
 
 class ParseLimit(ParseSqlMixIn):
-    def __init__(self):
-        """
+    def __init__(self, src):
+        """ 解析  offset, limit
+
+            :param src: 逗号分隔的正整数
         """
 
-    def parse_limit(self, limit):
+    def parse(self, limit):
         """
         """
+        offset, limit = [num.parse_int_or_zero_unsigned(i) 
+                             for i in str(limit).split(',').replace(' ', '')]
+
+        limit = limit if limit > 0  else 10
+        return offset, limit
 
 
 class ParseGroupBy(ParseSqlMixIn):
-    def __init__(self):
+    def __init__(self, src, table_map):
         """
+            :param src: 带解析字符串
+                eg: table.field$sum|table.field,avg|table.field
         """
+        self.src = src
+        self.table_map = table_map
+        self.sql_fn_white_list = ('sum', 'count', 'avg', 'max', 'min')
 
-    def parse_offset(self, offset):
+    def parse(self):
         """
         """
+        tmp = self.src.split('$')
+        by_field = self.get_map_attr_or_val(tmp[0], True, True)[0]
+        fn_strs = []
+        if len(tmp) > 1:
+            fn_fields = [item.split('|') for item in tmp[1].split(',')]
+            for item in fn_fields:
+                fn, field = item
+                if fn not in self.sql_fn_white_list:
+                    raise exc.YcmsSqlConditionParseError('group by 禁止使用该函数<' + fn + '>')
+                field = self.get_map_attr_or_val(field, True, True)
+                if not field[1]:
+                    raise exc.YcmsSqlConditionParseError(
+                        '字段不存在 <' + self.table_map.__name__ + '.' + field[0] + '>'
+                    )
+                fn_strs.append('%s(%s) as %s' % (fn, field[0], 
+                                                 '_'.join([fn, field[0].replace('.', '_')])))
+        if fn_strs:
+            fn_strs = ', '.join(fn_strs)
+
+        print('group by ' + by_field,  fn_strs)
+        return 'group by ' + by_field,  fn_strs
