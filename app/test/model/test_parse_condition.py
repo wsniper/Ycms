@@ -9,6 +9,7 @@ from app.schema import TABLES
 @pytest.fixture
 def data():
     d = {
+        'from_tables': ['user'],
         'where': [
             [('user.name', 'eq', 9), ('user.id', 'gt', '22')],
             [('user.name', 'like', '%ab%'), ('user.id', 'le', '23'), ('user.id', 'lt', '23')],
@@ -30,7 +31,7 @@ def data():
 def test_parse_condition(data):
     """ 解析 where / limit /offset 等sql子句
     """
-    pc = ParseCondition(data['where'], TABLES['user'])
+    pc = ParseCondition(data['where'])
     stm = pc.parse()
     print('\n********************** where ***************************')
     print(stm)
@@ -48,7 +49,7 @@ def test_parse_condition_order_by(data, app_with_db_inited):
 
     t_map = TABLES['user']
 
-    od = ParseOrderby(data['order_by'], t_map)
+    od = ParseOrderby(data['order_by'])
     order_by = od.parse()
     with app_with_db_inited.app_context():
         dbsess = get_dbsess()
@@ -89,7 +90,7 @@ def test_parse_condition_fields(data):
     """ field to select 
     """
     from sqlalchemy import text
-    rs = ParseFields(data['fields'], TABLES['user']).parse()
+    rs = ParseFields(data['fields']).parse()
     print(rs)
     assert str(rs) == 'user.name, user.id, user.add_time'
 
@@ -98,7 +99,7 @@ def test_parse_condition_fields(data):
 def test_parse_condition_group_by(data):
     """ group by
     """
-    rs = ParseGroupBy(data['group_by'], TABLES['user']).parse()
+    rs = ParseGroupBy(data['group_by']).parse()
     print(rs)
 
 
@@ -113,7 +114,7 @@ def test_parse_condition_benchmark(data):
     cnt = 10000
     st = time.time()
     for i in range(cnt):
-        pc = ParseCondition(data['where'], TABLES['user'])
+        pc = ParseCondition(data['where'])
         stm = pc.parse()
     total = time.time() - st
 
