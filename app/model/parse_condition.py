@@ -22,20 +22,20 @@ class ParseSqlMixIn:
     def get_map_attr_or_val(self, val, is_table=False, parse_field_with_no_flag_char=False):
         """ 将val 解析为数据库字段（返回值第二个布尔值标示）或普通字符串
 
-            :param parse_field_with_no_flag_char: 不带_@$@_也按照字段名解析
-            _@$@_tablename.field_name_@$@_
+            :param parse_field_with_no_flag_char: 不带也按照字段名解析
+            tablename.field_name
         """
+        self.splitor = getattr(self, 'splitor', '')
         val = str(val)
         rs = (''.join(['"', val, '"']), False)
         t_map = None
         t_map_f = None
-        if (val.count('.') == 1 and val.startswith('_@$@_') and 
-                                    val.endswith('_@$@_') or parse_field_with_no_flag_char):
-            t_name, f_name = val.replace('_@$@_', '').split('.')
+        if (val.count('.') == 1 and val.startswith(self.splitor) and 
+                                    val.endswith(self.splitor) or parse_field_with_no_flag_char):
+            t_name, f_name = val.replace(self.splitor, '').split('.')
             t_map = TABLES.get(t_name, None)
-            try:
-                t_map_f = getattr(t_map, f_name)
-            except AttributeError as e:
+            t_map_f = getattr(t_map, f_name, None)
+            if not t_map_f:
                 raise exc.YcmsSqlConditionParseError('字段不存在 <' + t_name + '.' + f_name + '>')
 
         if all([t_map, t_map_f]):
@@ -55,10 +55,13 @@ class ParseCondition(ParseSqlMixIn):
             # TODO 优化查询性能，将有索引的字段条件放到最前面
             # TODO 需要可以从多个TableMap 操作 现在只能从指定的“单表”操作。
 
-            专用分隔符：_@$@_
+            专用分隔符：
                 in/not in/exists/not exists/between中的逗号使用该分隔符代替
                 表名字段 前后用该分隔符包裹
         """
+        # 出现在“值”位置的‘字段’以及in/between等多值项的值使用self.splitor
+        self.splitor = '_@$@_'
+
         self.where = condition or []
         self.table_name = table_map.__tablename__
 
@@ -98,16 +101,18 @@ class ParseCondition(ParseSqlMixIn):
     def _parse_one(self, tuple_str):
         """ 解析一条的公共方法
 
-            :paramtuple_string:  待解析数据 3元素的tuple
-                eg: ('_@$@_user.name_@$@_', 'like', '%adf')
+            :paramtuple_string:  待解析数据 3元素的tuple 
+            !!! 只有右边（值）是字段时采用 分隔符 
+                eg: ('user.name', 'like', '%adf')
+                    ('user.age', 'eq', 'user.id')
         """
-        left = self.get_map_attr_or_val(tuple_str[0], True)
+        left = self.get_map_attr_or_val(tuple_str[0], True, True)
         right = self.get_map_attr_or_val(tuple_str[2])
 
         op = tuple_str[1]
         if op in ('in', 'notin', 'exsits', 'notexists'):
             param_list = []
-            for i in right[0].split('_@$@_'):
+            for i in right[0].split(self.splitor):
                 param_key = self._gen_param_key(left[0])
                 self.params[param_key] = ''.join(['"', i, '"'])
                 param_list.append(':' + param_key)
@@ -115,13 +120,14 @@ class ParseCondition(ParseSqlMixIn):
         elif op == 'between':
             param_key_1 = self._gen_param_key(left[0])
             param_key_2 = self._gen_param_key(left[0])
-            vals = right[0].split('_@$@_')
+            vals = right[0].split(self.splitor)
             if len(vals) != 2:
-                raise exc.YcmsSqlConditionParseError('between 需要两个值_@$@_隔开')
+                raise exc.YcmsSqlConditionParseError('between 需要两个值隔开')
             right = ' and '.join([':' + param_key_1, ':' + param_key_2])
             self.params[param_key_1] = ''.join(['"', vals[0], '"'])
             self.params[param_key_2] = ''.join(['"', vals[1], '"'])
         else:
+            # “值”不是“字段”
             if not right[1]:
                 param_key = self._gen_param_key(left[0])
                 self.params[param_key] = right[0]
@@ -139,13 +145,13 @@ class ParseCondition(ParseSqlMixIn):
     def parse_gt(self, tuple_arg):
         """ 解析sql操作符: > gt
 
-            ('_@$@_t_table_name.f_field_@$@_', 'gt', '_@$@_table_name.field2_@$@_'/val)
+            ('t_table_name.f_field', 'gt', 'table_name.field2'/val)
         """
         return text(' > '.join(self._parse_one(tuple_arg)))
 
     def parse_lt(self, tuple_arg):
         """ 解析sql操作符: < lt
-            ('_@$@_t_table_name.f_field_@$@_', '_@$@_table_name.field2_@$@_'/val)
+            ('t_table_name.f_field', 'table_name.field2'/val)
         """
         return text(' < '.join(self._parse_one(tuple_arg)))
 
@@ -288,6 +294,23 @@ class ParseGroupBy(ParseSqlMixIn):
                                                  '_'.join([fn, field[0].replace('.', '_')])))
         if fn_strs:
             fn_strs = ', '.join(fn_strs)
-
-        print('group by ' + by_field,  fn_strs)
         return 'group by ' + by_field,  fn_strs
+
+
+class UpdateAction:
+    """ dbsess.query(tableMap).filter(where).update(data)
+    """
+
+class ListAction:
+    """ 
+        dbsess.query(tableMap).fileds(fields).filter(where).order_by(order_by)\
+            .group_by(group_by).offset(offset).limit(limit).all()
+    """
+
+class DetailAction:
+    """ 
+        one() / on_or_none() / first()
+
+        dbsess.query(tableMap).fileds(fields).filter(where).order_by(order_by)\
+            .group_by(group_by).offset(offset).limit(limit).one()
+    """
