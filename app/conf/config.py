@@ -21,6 +21,6 @@ class EXC:
 
 
 class LOGGING:
-    sigle_file_max_bytes = 4096
-    max_file_count = 4096
+    sigle_file_max_bytes = 2000000
+    max_file_count = 2000000
     file_name = path.join(APP.root, 'log', 'ycms.log')

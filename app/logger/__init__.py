@@ -31,8 +31,8 @@ def init_logger(app):
     formatter = FormatterWithRequestInfo('[%(asctime)s] %(remote_addr)s requested %(url)s uid<%(uid)s>\n'
                                              '%(levelname)s in %(module)s: %(message)s')
     handler = handlers.RotatingFileHandler(filename=conf.LOGGING.file_name,
-                                               maxBytes=conf.LOGGING.sigle_file_max_bytes or 4096,
-                                               backupCount=conf.LOGGING.max_file_count or 4096)
+                                           maxBytes=conf.LOGGING.sigle_file_max_bytes or 2000000,
+                                           backupCount=conf.LOGGING.max_file_count or 2000000)
 
     handler.setFormatter(formatter)
     app.logger.addHandler(handler)
