@@ -2,7 +2,7 @@ import pytest
 
 from app.test import app_with_db_inited
 
-from app.model.parse_condition import (ParseCondition, ParseOrderby)
+from app.model.parse_condition import (ParseCondition, ParseOrderby, ParseFields, ParseGroupBy)
 from app.schema import TABLES
 
 
@@ -20,7 +20,9 @@ def data():
             # ('_@$@_user.id_@$@_', 'desc'),
             ('_@$@_user.add_time_@$@_', 'desc'),
             ('_@$@_user.last_update_time_@$@_', 'asc')
-        ]
+        ],
+        'group_by': 'user.last_update_time$avg|user.id,sum|user.add_time,count|user.id',
+        'fields': ['user.name', 'user.id', 'user.add_time']
     }
     yield d
 
@@ -52,8 +54,8 @@ def test_parse_condition_order_by(data, app_with_db_inited):
             t_map(name='aaa'),
             t_map(name='bbb'),
             t_map(name='ccc'),
-            t_map(name='ddd'),
-            t_map(name='eee'),
+            t_map(name='bbb'),
+            t_map(name='aaa'),
             t_map(name='fff'),
         ]
         for r in rows:
@@ -67,11 +69,35 @@ def test_parse_condition_order_by(data, app_with_db_inited):
         assert rs[0].name == 'fff'
 
         dbsess.query(t_map).filter(t_map.id>3).update({'last_update_time':999})
+        dbsess.commit()
         rs = dbsess.query(t_map).order_by(*order_by).all()
-        # for row in rs:
-        #     print(row)
+        for row in rs:
+            print(row)
         assert len(rs) == len(rows)
         assert rs[0].last_update_time == 999
+        csr = dbsess.bind.execute('select *, avg(last_update_time), count(*) as cnt from user group by name')
+
+        for i in csr.fetchall():
+            print(i)
+
+## fields
+
+def test_parse_condition_fields(data):
+    """ field to select 
+    """
+    from sqlalchemy import text
+    rs = ParseFields(data['fields'], TABLES['user']).parse()
+    print(rs)
+    assert str(rs) == 'user.name, user.id, user.add_time'
+
+## group by
+
+def test_parse_condition_group_by(data):
+    """ group by
+    """
+    rs = ParseGroupBy(data['group_by'], TABLES['user']).parse()
+    print(rs)
+
 
 
 ## 耗时的放最后

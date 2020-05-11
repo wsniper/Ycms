@@ -4,20 +4,14 @@
     :param where: where子句的定义 dict格式
 
     where f > 1 and f2<2 or f3 like '%..%' and f4 in (...) and f5 between 
-    
-    {
-        where: [ #or
-         [(), (), ()], # and
-         [(), (), ()], # and
-         [(), (), ()]  # and
-        ],
-        order_by: ['a desc', 'b asc'],
-        offset: n,
-        limit: n
-    }
+    [ #or
+        [(), (), ()], # and
+        [(), (), ()], # and
+        [(), (), ()]  # and
+    ]
 """
 
-from sqlalchemy import text, or_, and_
+from sqlalchemy import text, or_, and_, asc, desc
 
 from .. import exc
 from ..schema import TABLES
@@ -25,7 +19,26 @@ from ..schema import TABLES
 from ..logger import dlogger
 
 
-class ParseCondition:
+class ParseSqlMixIn:
+    def get_map_attr_or_val(self, string, is_table=False):
+        """ 解析
+            _@$@_tablename.field_name_@$@_
+        """
+        string = str(string)
+        rs = (''.join(['"', string, '"']), False)
+        t_map = None
+        t_map_f = None
+        if string.count('.') == 1 and string.startswith('_@$@_') and string.endswith('_@$@_'):
+            t_name, f_name = string.replace('_@$@_', '').split('.')
+            t_map = TABLES.get(t_name, None)
+            t_map_f = getattr(t_map, f_name)
+        if all([t_map, t_map_f]):
+            rs = ('.'.join([t_name, f_name]), True)
+        elif is_table:
+            raise exc.YcmsSqlConditionParseError(string)
+        return rs
+
+class ParseCondition(ParseSqlMixIn):
 
     def __init__(self, condition, table_map):
         """ 解析  where子句及limit/offset/order_by
@@ -38,10 +51,7 @@ class ParseCondition:
                 in/not in/exists/not exists/between中的逗号使用该分隔符代替
                 表名字段 前后用该分隔符包裹
         """
-        self.where = condition.get('where', [])
-        self.order_by = condition.get('order_by', '')
-        self.offset = condition.get('offset', '0')
-        self.limit = condition.get('limit', '0')
+        self.where = condition or []
         self.table_name = table_map.__tablename__
 
         self.params = {}
@@ -77,17 +87,14 @@ class ParseCondition:
             # print(or_rs, i)
         return or_(*or_rs)
 
-    def parse_other(self):
-        pass
-
     def _parse_one(self, tuple_str):
         """ 解析一条的公共方法
 
             :paramtuple_string:  待解析数据 3元素的tuple
                 eg: ('_@$@_user.name_@$@_', 'like', '%adf')
         """
-        left = self._get_map_attr_or_val(tuple_str[0], True)
-        right = self._get_map_attr_or_val(tuple_str[2])
+        left = self.get_map_attr_or_val(tuple_str[0], True)
+        right = self.get_map_attr_or_val(tuple_str[2])
 
         op = tuple_str[1]
         if op in ('in', 'notin', 'exsits', 'notexists'):
@@ -115,24 +122,6 @@ class ParseCondition:
                 right = right[0]
         left = left[0]
         return left, right
-
-    def _get_map_attr_or_val(self, string, is_table=False):
-        """ 解析
-            _@$@_tablename.field_name_@$@_
-        """
-        string = str(string)
-        rs = (''.join(['"', string, '"']), False)
-        t_map = None
-        t_map_f = None
-        if string.count('.') == 1 and string.startswith('_@$@_') and string.endswith('_@$@_'):
-            t_name, f_name = string.replace('_@$@_', '').split('.')
-            t_map = TABLES.get(t_name, None)
-            t_map_f = getattr(t_map, f_name)
-        if all([t_map, t_map_f]):
-            rs = ('.'.join([t_name, f_name]), True)
-        elif is_table:
-            raise exc.YcmsSqlConditionParseError(string)
-        return rs
 
     def _gen_param_key(self, field_name):
         # params计数自增 防止重名
@@ -203,13 +192,55 @@ class ParseCondition:
         return text(' not exists '.join(self._parse_one(tuple_arg)))
 
     def parse_order_by(self, tuple_arg):
-        """
+        """ 
+            :param tuple_arg: eg: [('_@$@_user.name_@$@_', 'asc'),('_@$@_user.id_@$@_', 'desc')]
         """
 
-    def parse_offset(self, offset):
+
+class ParseOrderby(ParseSqlMixIn):
+    """ 解析orderby
+    """
+    def __init__(self, src, table_map):
+        self.src = src
+        self.fn = {'asc': asc, 'desc': desc}
+        # self.get_map_attr_or_val 中需要
+        self.table_map = table_map
+
+    def parse(self):
+        """ 执行解析
+        """
+        rs = []
+        for item in self.src:
+            fn = self.fn.get(item[1])
+            field = self.get_map_attr_or_val(item[0], True)
+            if not all([len(item) == 2, fn]):
+                raise exc.YcmsSqlConditionParseError('order_by 需要明确指出升降序' + str(item))
+            rs.append(fn(text(field[0])))
+        return rs
+
+
+class ParseFields(ParseSqlMixIn):
+    """ 解析 需要操作的字段
+    """
+    def __init__(self, src, table_map):
+        pass
+
+
+class ParseLimit(ParseSqlMixIn):
+    def __init__(self):
         """
         """
 
     def parse_limit(self, limit):
+        """
+        """
+
+
+class ParseGroupBy(ParseSqlMixIn):
+    def __init__(self):
+        """
+        """
+
+    def parse_offset(self, offset):
         """
         """
