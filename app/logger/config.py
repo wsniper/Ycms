@@ -13,19 +13,19 @@ conf = {
             'stream': 'ext://flask.logging.wsgi_errors_stream',
             'formatter': 'default'
         },
-        'with_request_info_handler': {
+        'debug_handler': {
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': path.join(path.dirname(path.dirname(path.abspath(__file__))), 'log',
-                                  'ycms.log'),
+                                  'debug.log'),
             'mode': 'a',
-            'maxBytes': 4096,
+            'maxBytes': 99999,
             'backupCount': 999999999
         }
     },
     'loggers': {
-        'with_request_info': {
-            'level': 'INFO',
-            'handlers': ['with_request_info_handler']
+        'debug': {
+            'level': 'DEBUG',
+            'handlers': ['debug_handler']
         }
     },
     'default': {
