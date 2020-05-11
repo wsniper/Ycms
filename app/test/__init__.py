@@ -16,7 +16,6 @@ def client():
     app_ins.config['TESTING'] = True
 
     driver = DB.driver
-    print(db_name)
     DB.driver = 'sqlite:///' + db_name
     with app_ins.test_client() as client:
         with app_ins.app_context():

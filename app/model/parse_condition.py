@@ -63,7 +63,9 @@ class ParseCondition:
                 .filter(or_(and_(map.a, map.b), and_(map.c, map.d, map.e)..))
         """
         or_rs = []
+        i = 0
         for or_item in self.where:
+            i+=1
             and_rs = []
             for and_item in or_item:
                 op = and_item[1]
@@ -72,6 +74,7 @@ class ParseCondition:
                 m = getattr(self, 'parse_'+op)
                 and_rs.append(m(and_item))
             or_rs.append(and_(*and_rs))
+            # print(or_rs, i)
         return or_(*or_rs)
 
     def parse_other(self):
@@ -98,7 +101,6 @@ class ParseCondition:
             param_key_1 = self._gen_param_key(left[0])
             param_key_2 = self._gen_param_key(left[0])
             vals = right[0].split('_@$@_')
-            dlogger.debug([left, right, vals])
             if len(vals) != 2:
                 raise exc.YcmsSqlConditionParseError('between 需要两个值_@$@_隔开')
             right = ' and '.join([':' + param_key_1, ':' + param_key_2])

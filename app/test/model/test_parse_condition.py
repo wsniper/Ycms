@@ -1,10 +1,11 @@
+import pytest
+
 from app.model.parse_condition import ParseCondition
 from app.schema import TABLES
 
-def test_parse_condition():
-    """ 解析 where / limit /offset 等sql子句
-    """
 
+@pytest.fixture
+def data():
     d = {
         'where': [
             [('_@$@_user.name_@$@_', 'eq', 9), ('_@$@_user.id_@$@_', 'gt', '22')],
@@ -13,8 +14,29 @@ def test_parse_condition():
             [('_@$@_user.name_@$@_', 'between', 'aa_@$@_bb'), ('_@$@_user.id_@$@_', 'ge', '6'), ('_@$@_user.id_@$@_', 'neq', '7')],
         ]
     }
+    yield d
 
-    pc = ParseCondition(d, TABLES['user'])
+
+def test_parse_condition(data):
+    """ 解析 where / limit /offset 等sql子句
+    """
+    pc = ParseCondition(data, TABLES['user'])
     stm = pc.parse()
     print(stm)
-    print(pc.params)
+
+
+
+
+def test_parse_condition_benchmark(data):
+    """ 解析 where / limit /offset 等sql子句
+    """
+    import time
+    cnt = 10000
+    st = time.time()
+    for i in range(cnt):
+        pc = ParseCondition(data, TABLES['user'])
+        stm = pc.parse()
+    total = time.time() - st
+
+    print('total: %s S, cnt:%s, avg: %s S' % (total, cnt, total/cnt))
+
