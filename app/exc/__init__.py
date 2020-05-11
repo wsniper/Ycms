@@ -42,3 +42,8 @@ class YcmsSqlConditionParseError(YcmsSqlParseError):
         message = message or '非法sql条件 ' + str(data)
         super().__init__(message, data, logit)
 
+
+class YcmsDangerActionError(YcmsError):
+    def __init__(self, message, data='', logit=False):
+        message = message or '危险操作被禁止 ' + str(data)
+        super().__init__(message, data, logit)
