@@ -19,7 +19,7 @@ from ..logger import dlogger
 
 
 class ParseSqlMixIn:
-    def get_map_attr_or_val(self, val, is_table=False, parse_field_with_no_flag_char=False):
+    def get_map_attr_or_val(self, val, is_field=False, parse_field_with_no_flag_char=False):
         """ 将val 解析为数据库字段（返回值第二个布尔值标示）或普通字符串
 
             :param parse_field_with_no_flag_char: 不带也按照字段名解析
@@ -33,27 +33,26 @@ class ParseSqlMixIn:
         if (val.count('.') == 1 and val.startswith(self.splitor) and 
                                     val.endswith(self.splitor) or parse_field_with_no_flag_char):
             t_name, f_name = val.replace(self.splitor, '').split('.')
-            t_map = TABLES.get(t_name, None)
+            t_map = self.table_map_dict.get(t_name, None)
             t_map_f = getattr(t_map, f_name, None)
             if not t_map_f:
                 raise exc.YcmsSqlConditionParseError('字段不存在 <' + t_name + '.' + f_name + '>')
 
         if all([t_map, t_map_f]):
             rs = ('.'.join([t_name, f_name]), True)
-        elif is_table:
+        elif is_field:
             raise exc.YcmsSqlConditionParseError(val)
         return rs
 
 
 class ParseCondition(ParseSqlMixIn):
 
-    def __init__(self, condition, table_map):
+    def __init__(self, condition, table_map_dict=None):
         """ 解析  where子句及limit/offset/order_by
 
             仅实现了下面 op_white_list中的操作符/关键字
             
             # TODO 优化查询性能，将有索引的字段条件放到最前面
-            # TODO 需要可以从多个TableMap 操作 现在只能从指定的“单表”操作。
 
             专用分隔符：
                 in/not in/exists/not exists/between中的逗号使用该分隔符代替
@@ -61,15 +60,12 @@ class ParseCondition(ParseSqlMixIn):
         """
         # 出现在“值”位置的‘字段’以及in/between等多值项的值使用self.splitor
         self.splitor = '_@$@_'
-
         self.where = condition or []
-        self.table_name = table_map.__tablename__
-
         self.params = {}
         self.params_count = 0
-
         self.op_white_list = ('lt', 'gt', 'le', 'ge', 'eq', 'neq', 'in', 'notin', 'exists',
-                              'notexists', 'like', 'between', 'offset', 'limit', 'order_by')
+                              'notexists', 'like', 'between')
+        self.table_map_dict = table_map_dict or TABLES
 
     def parse(self):
         """ 解析
@@ -209,11 +205,10 @@ class ParseCondition(ParseSqlMixIn):
 class ParseOrderby(ParseSqlMixIn):
     """ 解析orderby
     """
-    def __init__(self, src, table_map):
+    def __init__(self, src, table_map_dict=None):
         self.src = src
         self.fn = {'asc': asc, 'desc': desc}
-        # self.get_map_attr_or_val 中需要
-        self.table_map = table_map
+        self.table_map_dict = table_map_dict or TABLES
 
     def parse(self):
         """ 执行解析
@@ -234,9 +229,9 @@ class ParseFields(ParseSqlMixIn):
         get_map_attr_or_val() 来确保 是真实字段
         :return: text('f, f, f, f')
     """
-    def __init__(self, src, table_map):
+    def __init__(self, src, table_map_dict=None):
         self.src = src
-        self.table_map = table_map
+        self.table_map_dict = table_map_dict or TABLES
 
     def parse(self):
         rs = []
@@ -252,26 +247,27 @@ class ParseLimit(ParseSqlMixIn):
 
             :param src: 逗号分隔的正整数
         """
+        self.src = src
 
-    def parse(self, limit):
+    def parse(self):
         """
         """
         offset, limit = [num.parse_int_or_zero_unsigned(i) 
-                             for i in str(limit).split(',').replace(' ', '')]
+                             for i in str(self.src).split(',').replace(' ', '')]
 
         limit = limit if limit > 0  else 10
         return offset, limit
 
 
 class ParseGroupBy(ParseSqlMixIn):
-    def __init__(self, src, table_map):
+    def __init__(self, src, table_map_dict=None):
         """
             :param src: 带解析字符串
                 eg: table.field$sum|table.field,avg|table.field
         """
         self.src = src
-        self.table_map = table_map
         self.sql_fn_white_list = ('sum', 'count', 'avg', 'max', 'min')
+        self.table_map_dict = table_map_dict or TABLES
 
     def parse(self):
         """
@@ -288,7 +284,7 @@ class ParseGroupBy(ParseSqlMixIn):
                 field = self.get_map_attr_or_val(field, True, True)
                 if not field[1]:
                     raise exc.YcmsSqlConditionParseError(
-                        '字段不存在 <' + self.table_map.__name__ + '.' + field[0] + '>'
+                        '字段不存在 <' + field[0] + '>'
                     )
                 fn_strs.append('%s(%s) as %s' % (fn, field[0], 
                                                  '_'.join([fn, field[0].replace('.', '_')])))
@@ -297,9 +293,31 @@ class ParseGroupBy(ParseSqlMixIn):
         return 'group by ' + by_field,  fn_strs
 
 
+class BaseAction:
+    def __init__(self, dbsession, from_tables, table_map_dict, 
+                      condition, order_by='', group_by='', limit='', data=None):
+        """
+        """
+        pass
+
+    def MakeQuery(self):
+        query = dbsess.query(self.table_map)
+        where = ParseCondition(self.condition, self.table_name).parse()
+
+
 class UpdateAction:
-    """ dbsess.query(tableMap).filter(where).update(data)
+    """ 
+        !!! 没有 condition（filter）直接不能操作。防止误改全表
+        dbsess.query(tableMap).filter(where).update(data)
     """
+
+
+class DeleteAction:
+    """ 
+        !!! 没有 condition（filter）直接不能操作。防止误删全表
+        dbsess.query(tableMap).filter(where).update(data)
+    """
+
 
 class ListAction:
     """ 
@@ -307,9 +325,21 @@ class ListAction:
             .group_by(group_by).offset(offset).limit(limit).all()
     """
 
+
 class DetailAction:
     """ 
-        one() / on_or_none() / first()
+        one()  
+            结果不是一个会抛异常
+            无结果: sqlalchemy.orm.exc.NoResultFound
+            结果多于一个: sqlalchemy.orm.exc.MultipleResultsFound
+        on_or_none()
+            无结果:  返回None
+            结果多于一个会抛异常
+            结果多于一个: sqlalchemy.orm.exc.MultipleResultsFound
+        first() == ...limit(1)
+            不会抛异常
+            无结果： 返回None
+            因为实际使用limit(1) 查询的 所以最多返回一个结果
 
         dbsess.query(tableMap).fileds(fields).filter(where).order_by(order_by)\
             .group_by(group_by).offset(offset).limit(limit).one()
