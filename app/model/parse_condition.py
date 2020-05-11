@@ -28,7 +28,15 @@ from ..logger import dlogger
 class ParseCondition:
 
     def __init__(self, condition, table_map):
-        """ 解析  
+        """ 解析  where子句及limit/offset/order_by
+
+            仅实现了下面 op_white_list中的操作符/关键字
+            
+            TODO 优化查询性能，将有索引的字段条件放到最前面
+
+            专用分隔符：_@$@_
+                in/not in/exists/not exists/between中的逗号使用该分隔符代替
+                表名字段 前后用该分隔符包裹
         """
         self.where = condition.get('where', [])
         self.order_by = condition.get('order_by', '')
@@ -72,8 +80,8 @@ class ParseCondition:
     def _parse_one(self, tuple_str):
         """ 解析一条的公共方法
 
-            :paramtuple_string:  带解析数据 2元素的tuple
-                eg: (.., ..)
+            :paramtuple_string:  待解析数据 3元素的tuple
+                eg: ('_@$@_user.name_@$@_', 'like', '%adf')
         """
         left = self._get_map_attr_or_val(tuple_str[0], True)
         right = self._get_map_attr_or_val(tuple_str[2])
@@ -92,12 +100,11 @@ class ParseCondition:
             vals = right[0].split('_@$@_')
             dlogger.debug([left, right, vals])
             if len(vals) != 2:
-                raise exc.YcmsSqlConditionParseError('between 需要两个值')
+                raise exc.YcmsSqlConditionParseError('between 需要两个值_@$@_隔开')
             right = ' and '.join([':' + param_key_1, ':' + param_key_2])
             self.params[param_key_1] = ''.join(['"', vals[0], '"'])
             self.params[param_key_2] = ''.join(['"', vals[1], '"'])
         else:
-            # 需要将值 用param代替 防止注入
             if not right[1]:
                 param_key = self._gen_param_key(left[0])
                 self.params[param_key] = right[0]
