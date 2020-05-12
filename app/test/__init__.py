@@ -36,6 +36,7 @@ def app_with_db_inited():
 
     driver = DB.driver
     DB.driver = 'sqlite:///' + db_name
+
     with app_ins.app_context():
         init_db()
 

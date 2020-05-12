@@ -9,7 +9,7 @@ from app.schema import TABLES
 @pytest.fixture
 def data():
     d = {
-        'from_tables': ['user'],
+        'dist_tables': ['user'],
         'where': [
             [('user.name', 'eq', 9), ('user.id', 'gt', '22')],
             [('user.name', 'like', '%ab%'), ('user.id', 'le', '23'), ('user.id', 'lt', '23')],

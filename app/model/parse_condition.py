@@ -196,11 +196,11 @@ class ParseCondition(ParseSqlMixIn):
         return text(' not exists '.join(self._parse_one(tuple_arg)))
 
 
-class ParseOrderby(ParseSqlMixIn):
+class ParseOrderBy(ParseSqlMixIn):
     """ 解析orderby
     """
     def __init__(self, src, table_map_dict=None):
-        self.src = src
+        self.src = src 
         self.fn = {'asc': asc, 'desc': desc}
         self.table_map_dict = table_map_dict or TABLES
 
@@ -246,8 +246,11 @@ class ParseLimit(ParseSqlMixIn):
     def parse(self):
         """
         """
-        offset, limit = [num.parse_int_or_zero_unsigned(i) 
-                             for i in str(self.src).split(',').replace(' ', '')]
+        offset = 0
+        limit = 10
+        if self.src:
+            offset, limit = [num.parse_int_or_zero_unsigned(i) 
+                                 for i in str(self.src).split(',').replace(' ', '')]
 
         limit = limit if limit > 0  else 10
         return offset, limit
@@ -266,6 +269,8 @@ class ParseGroupBy(ParseSqlMixIn):
     def parse(self):
         """
         """
+        if not self.src:
+            return ''
         tmp = self.src.split('$')
         by_field = self.get_map_attr_or_val(tmp[0], True, True)[0]
         fn_strs = []
@@ -284,4 +289,4 @@ class ParseGroupBy(ParseSqlMixIn):
                                                  '_'.join([fn, field[0].replace('.', '_')])))
         if fn_strs:
             fn_strs = ', '.join(fn_strs)
-        return 'group by ' + by_field,  fn_strs
+        return by_field,  fn_strs

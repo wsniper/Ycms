@@ -1,10 +1,13 @@
 """ 封装sqlalchemy URD操作
 """
+import logging
+from flask import current_app
+from sqlalchemy import text
 
 from .parse_condition import (
     ParseCondition,
     ParseFields,
-    ParseOrderby,
+    ParseOrderBy,
     ParseGroupBy,
     ParseLimit
 )
@@ -12,7 +15,7 @@ from .parse_condition import (
 
 class BaseAction:
     def __init__(self, dbsession, dist_tables, table_map_dict, 
-                      condition, order_by_str='', group_by_str='', limit_str=''):
+                      condition, order_by_str='', group_by_str='', limit_str='', data=None):
         """ 数据库操作（URD）基类
 
             组装sqlalchemy.Query
@@ -36,7 +39,7 @@ class BaseAction:
         """
         t_maps = []
         t_not_exists = []
-        for t_name in self.form_tables:
+        for t_name in self.dist_tables:
             t_map = self.table_map_dict.get(t_name)
             if t_map:
                 t_maps.append(t_map)
@@ -48,13 +51,17 @@ class BaseAction:
 
     def query(self):
         """ 组装sqlalchemy 查询语句
+
+            TODO 缺少fields解析
+            TODO 需要将解析异常全部包裹 并抛出自定义异常 具体是从这里还是各个解析器做 待定
         """
-        query = dbsess.query(*self.get_dist_table_map())
+        query = self.dbsession.query(*self.get_dist_table_map())
         where = ParseCondition(self.condition).parse()
-        order_by = ParseOrderby(self.order_by_str).parse()
-        group_by = Parsegroupby(self.group_by_str).parse()
+        order_by = ParseOrderBy(self.order_by_str).parse()
+        group_by = ParseGroupBy(self.group_by_str).parse()
         offset, limit = ParseLimit(self.limit_str).parse()
-        if where:
+        # !!! 不能直接使用if where  因为其未sqlalchemy.text且未实现预期的 __bool__
+        if str(where): 
             query = query.filter(where)
         elif self.action_name in ('update', 'delete'):
             raise exc.YcmsDangerActionError('数据库操作，更新/删除必须限定条件')
@@ -76,23 +83,25 @@ class CreateAction(BaseAction):
             :param buld: 是否使用sqlalchem的 bulk_insert_mappings
             其他param参加 BaseAction
         """
+        self.bulk = bulk
         self.action_name = 'create'
         super().__init__(dbsession, dist_tables, table_map_dict, 
-                         condition, order_by_str, group_by_st, limit)
+                         condition, order_by_str, group_by_str, limit_str, data)
 
     def do(self):
-        for table_name, values in data.items():
+        logging.getLogger('debug').info(self.data)
+        for table_name, values in self.data.items():
             t_schema = self.table_map_dict.get(table_name)
             if not t_schema:
                 raise exc.YcmsTableNotExistsError(None, 'app.schema.' + table_name)
-            if bulk_insert: 
+            if self.bulk: 
                 if values:
-                    dbsess.bulk_insert_mappings(t_schema, values)
+                    self.dbsession.bulk_insert_mappings(t_schema, values)
             else:
                 values = [t_schema(**value) for value in values]
                 if values:
-                    dbsess.add_all(values)
-        return dbsess
+                    self.dbsession.add_all(values)
+        return self.dbsession
 
 
 class UpdateAction(BaseAction):
@@ -104,10 +113,13 @@ class UpdateAction(BaseAction):
                       condition, order_by_str='', group_by_str='', limit_str='', data=None):
         self.action_name = 'update'
         super().__init__(dbsession, dist_tables, table_map_dict, 
-                         condition, order_by_str, group_by_st, limit)
+                         condition, order_by_str, group_by_str, limit_str, data)
 
     def do(self):
-        return  self.query().update(data)
+        query = self.query()
+        if not self.data:
+            raise exc.YcmsDBDataRequiredError('缺少update所需的数据')
+        return  self.query().update(self.data)
 
 
 class DeleteAction(BaseAction):
@@ -119,7 +131,7 @@ class DeleteAction(BaseAction):
                       condition, order_by_str='', group_by_str='', limit_str='', data=None):
         self.action_name = 'delete'
         super().__init__(dbsession, dist_tables, table_map_dict, 
-                         condition, order_by_str, group_by_st, limit)
+                         condition, order_by_str, group_by_str, limit_str)
 
     def do(self):
         return  self.query().delete()
@@ -134,7 +146,7 @@ class ListAction(BaseAction):
                       condition, order_by_str='', group_by_str='', limit_str='', data=None):
         self.action_name = 'list'
         super().__init__(dbsession, dist_tables, table_map_dict, 
-                         condition, order_by_str, group_by_st, limit, data)
+                         condition, order_by_str, group_by_str, limit_str)
 
     def do(self):
         return self.query().all()
@@ -163,7 +175,7 @@ class OneAction(BaseAction):
         self.action_name = 'one'
         limit = '0,1'
         super().__init__(dbsession, dist_tables, table_map_dict, 
-                         condition, order_by_str, group_by_st, limit, data)
+                         condition, order_by_str, group_by_str, limit_str)
 
     def do(self):
         return self.query().all()

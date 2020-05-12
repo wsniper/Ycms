@@ -15,7 +15,27 @@ class YcmsError(Exception):
                 )
 
 
-class YcmsTableNotExistsError(YcmsError):
+class YcmsDBError(YcmsError):
+    """ 数据库操作异常
+
+        包括:
+            - 解析条件并生成sqlalchemy操作语句
+            - 实际操作数据库数据
+    """
+    def __init__(self, message, data='', logit=False):
+        message = message or '数据库操作失败: ' + str(data)
+        super().__init__(message, data, logit)
+
+
+class YcmsDBDataRequiredError(YcmsDBError):
+    """ update/add 需要传入数据
+    """
+    def __init__(self, message, data='', logit=False):
+        message = message or '需要传入新增/修改数据库的数据: ' + str(data)
+        super().__init__(message, data, logit)
+
+
+class YcmsTableNotExistsError(YcmsDBError):
     """ 待操作的数据表不存在
     """
     def __init__(self, message, data='', logit=False):
@@ -23,7 +43,7 @@ class YcmsTableNotExistsError(YcmsError):
         super().__init__(message, data, logit)
 
 
-class YcmsSqlParseError(YcmsError):
+class YcmsSqlParseError(YcmsDBError):
     """ 解析sql失败
     """
     def __init__(self, message, data='', logit=False):
