@@ -2,7 +2,7 @@ import pytest
 
 from app.test import app_with_db_inited
 
-from app.model.parse_condition import (ParseCondition, ParseOrderby, ParseFields, ParseGroupBy)
+from app.model.parse_condition import (ParseCondition, ParseOrderBy, ParseFields, ParseGroupBy)
 from app.schema import TABLES
 
 
@@ -49,7 +49,7 @@ def test_parse_condition_order_by(data, app_with_db_inited):
 
     t_map = TABLES['user']
 
-    od = ParseOrderby(data['order_by'])
+    od = ParseOrderBy(data['order_by'])
     order_by = od.parse()
     with app_with_db_inited.app_context():
         dbsess = get_dbsess()

@@ -4,6 +4,7 @@ import logging
 from flask import current_app
 from sqlalchemy import text
 
+from .. import exc
 from .parse_condition import (
     ParseCondition,
     ParseFields,
@@ -56,18 +57,25 @@ class BaseAction:
             TODO 需要将解析异常全部包裹 并抛出自定义异常 具体是从这里还是各个解析器做 待定
         """
         query = self.dbsession.query(*self.get_dist_table_map())
-        where = ParseCondition(self.condition).parse()
+        where = ParseCondition(self.condition)
+        params = where.params
+        where = where.parse()
         order_by = ParseOrderBy(self.order_by_str).parse()
         group_by = ParseGroupBy(self.group_by_str).parse()
         offset, limit = ParseLimit(self.limit_str).parse()
+        print('\n\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\')
+        print(where, params)
+        print('\n\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\')
         # !!! 不能直接使用if where  因为其未sqlalchemy.text且未实现预期的 __bool__
         if str(where): 
             query = query.filter(where)
+            if params:
+                query = query.params(**params)
         elif self.action_name in ('update', 'delete'):
             raise exc.YcmsDangerActionError('数据库操作，更新/删除必须限定条件')
-        if self.action_name in ('list', 'one') and order_by:
+        if self.action_name in ('list', 'one') and str(order_by):
             query = query.order_by(order_by)
-        if self.action_name in ('list', 'one') and  group_by:
+        if self.action_name in ('list', 'one') and  str(group_by):
             query = query.group_by(group_by)
         if self.action_name in ('list', 'one') and  limit:
             query = query.offset(offset or 0).limit(limit)
@@ -116,10 +124,23 @@ class UpdateAction(BaseAction):
                          condition, order_by_str, group_by_str, limit_str, data)
 
     def do(self):
-        query = self.query()
         if not self.data:
             raise exc.YcmsDBDataRequiredError('缺少update所需的数据')
-        return  self.query().update(self.data)
+        # !!! 因为使用了 text() 函数 所以不能自动同步session
+        # False - don’t synchronize the session. This option is the most efficient and is reliable
+        # once the session is expired, which typically occurs after a commit(), or explicitly using
+        # expire_all(). Before the expiration, updated objects may still remain in the session with
+        # stale values on their attributes, which can lead to confusing results.
+
+        # 'fetch' - performs a select query before the update to find objects that are matched by the
+        # update query. The updated attributes are expired on matched objects.
+
+        # 'evaluate' - Evaluate the Query’s criteria in Python straight on the objects in the
+        # session. If evaluation of the criteria isn’t implemented, an exception is raised.
+
+        # The expression evaluator currently doesn’t account for differing string collations between
+        # the database and Python.
+        return  self.query().update(self.data, synchronize_session=False)
 
 
 class DeleteAction(BaseAction):

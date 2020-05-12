@@ -1,7 +1,7 @@
 import pytest
 
 from app.model import curd
-from app.exc import YcmsTableNotExistsError
+import app.exc as exc
 
 from app.test import app_with_db_inited
 
@@ -17,7 +17,7 @@ def test_curd_c(app_with_db_inited):
         ]
     }
     with app_with_db_inited.app_context():
-        dbsess, Table = curd.create(data, bulk_insert=False)
+        dbsess = curd.create(data, bulk=False)
         csr = dbsess.bind.connect().execute('select name from user')
         rs = csr.fetchall()
         # print(rs)
@@ -37,7 +37,7 @@ def test_curd_c_bulk_insert(app_with_db_inited):
         ]
     }
     with app_with_db_inited.app_context():
-        dbsess, Table = curd.create(data)
+        dbsess = curd.create(data)
         csr = dbsess.bind.connect().execute('select name, * from user')
         rs = csr.fetchall()
         # ars = dbsess.query(Table).all()
@@ -62,8 +62,8 @@ def test_curd_c_exc_table_not_exists(app_with_db_inited):
         'user': [{'a': 'b'}]
     }
     with app_with_db_inited.app_context():
-        with pytest.raises(YcmsTableNotExistsError):
+        with pytest.raises(exc.YcmsTableNotExistsError):
             dbsess, Table = curd.create(data)
             dbsess_01, Table_01 = curd.create(data_01)
 
-        dbsess_02, Table_02 = curd.create(data_02)
+        dbsess_02 = curd.create(data_02)
