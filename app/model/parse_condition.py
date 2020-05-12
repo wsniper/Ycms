@@ -26,7 +26,7 @@ class ParseSqlMixIn:
             tablename.field_name
         """
         self.splitor = getattr(self, 'splitor', '')
-        val = str(val)
+        val = str(val) #str(val) if isinstance(val, (int, float)) else ''.join(['"', str(val), '"'])
         rs = (val, False)
         t_map = None
         t_map_f = None
@@ -104,7 +104,7 @@ class ParseCondition(ParseSqlMixIn):
             param_list = []
             for i in right[0].split(self.splitor):
                 param_key = self._gen_param_key(left[0])
-                self.params[param_key] = ''.join(['"', i, '"'])
+                self.params[param_key] = i
                 param_list.append(':' + param_key)
             right = ''.join(['(', ','.join(param_list), ')'])
         elif op == 'between':
@@ -114,8 +114,14 @@ class ParseCondition(ParseSqlMixIn):
             if len(vals) != 2:
                 raise exc.YcmsSqlConditionParseError('between 需要两个值隔开')
             right = ' and '.join([':' + param_key_1, ':' + param_key_2])
-            self.params[param_key_1] = ''.join(['"', vals[0], '"'])
-            self.params[param_key_2] = ''.join(['"', vals[1], '"'])
+            self.params[param_key_1] = vals[0]
+            self.params[param_key_2] = vals[1]
+        elif op == 'like':
+            param_key = self._gen_param_key(left[0])
+            val = right[0].strip('%')
+            val_ = val.replace('%', '%%')
+            self.params[param_key] = right[0].replace(val, val_)
+            right = ':' + param_key
         else:
             # “值”不是“字段”
             if not right[1]:
@@ -168,7 +174,8 @@ class ParseCondition(ParseSqlMixIn):
     def parse_like(self, tuple_arg):
         """ 解析sql操作符: like like
         """
-        return text(' like '.join(self._parse_one(tuple_arg)))
+        rs = self._parse_one(tuple_arg)
+        return text(' like '.join(rs)) 
 
     def parse_in(self, tuple_arg):
         """ 解析sql操作符: in in

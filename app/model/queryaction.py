@@ -186,7 +186,7 @@ class DeleteAction(BaseAction):
                          condition, None, None, None, None, data)
 
     def do(self):
-        return  self.query().delete()
+        return  self.query().delete(synchronize_session=False)
 
 
 class ListAction(BaseAction):
