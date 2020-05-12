@@ -31,7 +31,7 @@ def data():
 def test_parse_condition(data):
     """ 解析 where / limit /offset 等sql子句
     """
-    pc = ParseCondition(data['where'])
+    pc = ParseCondition(data['where'], table_map_dict=TABLES)
     stm = pc.parse()
     print('\n********************** where ***************************')
     print(stm)
@@ -49,7 +49,7 @@ def test_parse_condition_order_by(data, app_with_db_inited):
 
     t_map = TABLES['user']
 
-    od = ParseOrderBy(data['order_by'])
+    od = ParseOrderBy(data['order_by'], table_map_dict=TABLES)
     order_by = od.parse()
     with app_with_db_inited.app_context():
         dbsess = get_dbsess()
@@ -90,7 +90,7 @@ def test_parse_condition_fields(data):
     """ field to select 
     """
     from sqlalchemy import text
-    rs = ParseFields(data['fields']).parse()
+    rs = ParseFields(data['fields'], table_map_dict=TABLES).parse()
     print(rs)
     assert str(rs) == 'user.name, user.id, user.add_time'
 
@@ -99,7 +99,7 @@ def test_parse_condition_fields(data):
 def test_parse_condition_group_by(data):
     """ group by
     """
-    rs = ParseGroupBy(data['group_by']).parse()
+    rs = ParseGroupBy(data['group_by'], table_map_dict=TABLES).parse()
     print(rs)
 
 

@@ -13,7 +13,7 @@
 from sqlalchemy import text, or_, and_, asc, desc
 
 from .. import exc
-from ..schema import TABLES
+from ..util import num
 
 from ..logger import dlogger
 
@@ -65,7 +65,7 @@ class ParseCondition(ParseSqlMixIn):
         self.params_count = 0
         self.op_white_list = ('lt', 'gt', 'le', 'ge', 'eq', 'neq', 'in', 'notin', 'exists',
                               'notexists', 'like', 'between')
-        self.table_map_dict = table_map_dict or TABLES
+        self.table_map_dict = table_map_dict
 
     def parse(self):
         """ 解析where子句
@@ -202,7 +202,7 @@ class ParseOrderBy(ParseSqlMixIn):
     def __init__(self, src, table_map_dict=None):
         self.src = src or [] 
         self.fn = {'asc': asc, 'desc': desc}
-        self.table_map_dict = table_map_dict or TABLES
+        self.table_map_dict = table_map_dict
 
     def parse(self):
         """ 执行解析
@@ -225,7 +225,7 @@ class ParseFields(ParseSqlMixIn):
     """
     def __init__(self, src, table_map_dict=None):
         self.src = src or []
-        self.table_map_dict = table_map_dict or TABLES
+        self.table_map_dict = table_map_dict
 
     def parse(self):
         rs = []
@@ -249,8 +249,8 @@ class ParseLimit(ParseSqlMixIn):
         offset = 0
         limit = 10
         if self.src:
-            offset, limit = [num.parse_int_or_zero_unsigned(i) 
-                                 for i in str(self.src).split(',').replace(' ', '')]
+            offset, limit = [num.parse_int_or_zero_unsigned(str(i).replace(' ', '')) 
+                                 for i in str(self.src).split(',')]
 
         limit = limit if limit > 0  else 10
         return offset, limit
@@ -264,7 +264,7 @@ class ParseGroupBy(ParseSqlMixIn):
         """
         self.src = src or ''
         self.sql_fn_white_list = ('sum', 'count', 'avg', 'max', 'min')
-        self.table_map_dict = table_map_dict or TABLES
+        self.table_map_dict = table_map_dict
 
     def parse(self):
         """

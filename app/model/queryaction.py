@@ -33,6 +33,7 @@ class BaseAction:
         self.limit_str = limit_str
         self.data = data 
         self.action_name = ''
+        print(self.data)
 
     def get_dist_table_map(self):
         """ 获取要查询表的map
@@ -59,7 +60,7 @@ class BaseAction:
         """
         query = self.dbsession.query(*self.get_dist_table_map())
         fields = ParseFields(self.fields)
-        where = ParseCondition(self.condition)
+        where = ParseCondition(self.condition, self.table_map_dict)
         params = where.params
         where = where.parse()
         order_by = ParseOrderBy(self.order_by_str).parse()
@@ -85,7 +86,7 @@ class CreateAction(BaseAction):
     """ (批量)新增数据
     """
     def __init__(self, dbsession, dist_tables, table_map_dict, 
-                  condition=None, order_by_str='', group_by_str='', limit_str='', data=None, bulk=True):
+                  condition=None, fields=None, order_by_str='', group_by_str='', limit_str='', data=None, bulk=True):
         """
             :param buld: 是否使用sqlalchem的 bulk_insert_mappings
             其他param参加 BaseAction
@@ -93,7 +94,7 @@ class CreateAction(BaseAction):
         self.bulk = bulk
         self.action_name = 'create'
         super().__init__(dbsession, dist_tables, table_map_dict, 
-                         condition, order_by_str, group_by_str, limit_str, data)
+                         condition, fields, order_by_str, group_by_str, limit_str, data)
 
     def do(self):
         logging.getLogger('debug').info(self.data)
@@ -116,11 +117,12 @@ class UpdateAction(BaseAction):
         !!! 没有 condition（filter）直接不能操作。防止误改全表
         dbsess.query(tableMap).filter(where).update(data)
     """
-    def __init__(self, dbsession, dist_tables, table_map_dict, 
-                      condition, order_by_str='', group_by_str='', limit_str='', data=None):
+    def __init__(self, dbsession, dist_tables, table_map_dict, condition, 
+                 fields=None, order_by_str='', group_by_str='', limit_str='', data=None, bulk=True):
         self.action_name = 'update'
+        self.bulk = bulk
         super().__init__(dbsession, dist_tables, table_map_dict, 
-                         condition, order_by_str, group_by_str, limit_str, data)
+                         condition, None, None, None, None, data)
 
     def do(self):
         if not self.data:
@@ -139,6 +141,7 @@ class UpdateAction(BaseAction):
 
         # The expression evaluator currently doesn’t account for differing string collations between
         # the database and Python.
+        # todo  self.dbsession.bulk_update_mapping(mapper, data)
         return  self.query().update(self.data, synchronize_session=False)
 
 
@@ -148,10 +151,10 @@ class DeleteAction(BaseAction):
         dbsess.query(tableMap).filter(where).update(data)
     """
     def __init__(self, dbsession, dist_tables, table_map_dict, 
-                      condition, order_by_str='', group_by_str='', limit_str='', data=None):
+                      condition, fields=None, order_by_str='', group_by_str='', limit_str='', data=None):
         self.action_name = 'delete'
         super().__init__(dbsession, dist_tables, table_map_dict, 
-                         condition, order_by_str, group_by_str, limit_str)
+                         condition, None, None, None, None, data)
 
     def do(self):
         return  self.query().delete()
@@ -163,10 +166,10 @@ class ListAction(BaseAction):
             .group_by(group_by).offset(offset).limit(limit).all()
     """
     def __init__(self, dbsession, dist_tables, table_map_dict, 
-                      condition, order_by_str='', group_by_str='', limit_str='', data=None):
+                      condition, fields=None,  order_by_str='', group_by_str='', limit_str='', data=None):
         self.action_name = 'list'
         super().__init__(dbsession, dist_tables, table_map_dict, 
-                         condition, order_by_str, group_by_str, limit_str)
+                         condition, feilds, order_by_str, group_by_str, limit_str)
 
     def do(self):
         return self.query().all()
@@ -191,11 +194,10 @@ class OneAction(BaseAction):
             .group_by(group_by).offset(offset).limit(limit).one()
     """
     def __init__(self, dbsession, dist_tables, table_map_dict, 
-                      condition, order_by_str='', group_by_str='', limit_str='', data=None):
+                      condition, fields=None,  order_by_str='', group_by_str='', limit_str='', data=None):
         self.action_name = 'one'
-        limit = '0,1'
         super().__init__(dbsession, dist_tables, table_map_dict, 
-                         condition, order_by_str, group_by_str, limit_str)
+                         condition, feilds, order_by_str, group_by_str, '0,1')
 
     def do(self):
         return self.query().all()

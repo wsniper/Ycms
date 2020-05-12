@@ -67,7 +67,7 @@ def test_update(app_with_db_inited, data):
 
     with app_with_db_inited.app_context():
         dbsess = get_dbsess()
-        UpdateAction(dbsess, dist_tables=d['dist_tables'], table_map_dict=TABLES, 
+        UpdateAction(dbsess, dist_tables=d['dist_tables'],table_map_dict=TABLES, 
                      condition=d['condition'], data=d['data']).do()
 
 

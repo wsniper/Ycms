@@ -2,6 +2,7 @@ import pytest
 
 from app.model import curd
 import app.exc as exc
+from app.schema import TABLES
 
 from app.test import app_with_db_inited
 
