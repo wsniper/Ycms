@@ -27,6 +27,14 @@ class YcmsDBError(YcmsError):
         super().__init__(message, data, logit)
 
 
+class YcmsDBFieldNotExistsError(YcmsDBError):
+    """ 的表中不存在该传入的字段
+    """
+    def __init__(self, message, data='', logit=False):
+        message = message or '表中不存在该字段: ' + str(data)
+        super().__init__(message, data, logit)
+
+
 class YcmsDBDataRequiredError(YcmsDBError):
     """ update/add 需要传入数据
     """

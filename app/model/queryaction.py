@@ -32,8 +32,6 @@ class BaseAction:
         self.group_by_str = group_by_str
         self.limit_str = limit_str
         self.data = data 
-        self.action_name = ''
-        print(self.data)
 
     def get_dist_table_map(self):
         """ 获取要查询表的map
@@ -49,8 +47,30 @@ class BaseAction:
             else:
                 t_not_exists.append(t_name)
         if t_not_exists:
-            raise exc.YcmsTableNotExistsError('要查询的表不存在: ' + str(t_not_exists))
+            raise exc.YcmsTableNotExistsError('要操作的表不存在: ' + str(t_not_exists))
         return t_maps
+
+    def get_fields_name(self, mapper):
+        """ 取 数据表 字段名列表
+
+            :param mapper: sqlalchemy table mapper
+        """
+        return [f_name for f_name in tuple(mapper.__dict__) if not f_name.startswith('_')]
+
+
+    def field_in_mapper(self, f_name, mapper):
+        """ 检查字段名 是否在mapper中
+        """
+        return f_name in self.get_fields_name(mapper)
+
+
+    def keys_not_in_mapper(self, dict_data, mapper):
+        """ 获取 所有不在mapper中的dict_data 的keys
+
+            为空则说明都在（或者 dict_data 是空的）
+        """
+        return [k for k in dict_data.keys() if not self.field_in_mapper(k, mapper)]
+
 
     def query(self):
         """ 组装sqlalchemy 查询语句
@@ -67,12 +87,12 @@ class BaseAction:
         group_by = ParseGroupBy(self.group_by_str).parse()
         offset, limit = ParseLimit(self.limit_str).parse()
         # !!! 不能直接使用if where/order_by/group_by  因为其未sqlalchemy.text且未实现预期的 __bool__
-        if str(where): 
+        if len(str(where)) > 0: 
             query = query.filter(where)
             if params:
                 query = query.params(**params)
         elif self.action_name in ('update', 'delete'):
-            raise exc.YcmsDangerActionError('数据库操作，更新/删除必须限定条件')
+            raise exc.YcmsDangerActionError('数据库危险操作! <%s，必须限定条件(需要where子句)>' % self.action_name)
         if self.action_name in ('list', 'one') and str(order_by):
             query = query.order_by(order_by)
         if self.action_name in ('list', 'one') and  str(group_by):
@@ -96,17 +116,26 @@ class CreateAction(BaseAction):
         super().__init__(dbsession, dist_tables, table_map_dict, 
                          condition, fields, order_by_str, group_by_str, limit_str, data)
 
+
+
     def do(self):
-        logging.getLogger('debug').info(self.data)
+        # logging.getLogger('debug').info(self.data)
         for table_name, values in self.data.items():
-            t_schema = self.table_map_dict.get(table_name)
-            if not t_schema:
+            mapper = self.table_map_dict.get(table_name)
+            if not mapper:
                 raise exc.YcmsTableNotExistsError(None, 'app.schema.' + table_name)
+            if not values:
+                raise exc.YcmsDBDataRequiredError('请传入需要添加的数据字典列表')
+            for value in values:
+                err_keys = self.keys_not_in_mapper(value, mapper)
+                if err_keys:
+                    raise exc.YcmsDBFieldNotExistsError('数据表%s中不存在字段<%s>' %
+                                                        (mapper, err_keys))
             if self.bulk: 
                 if values:
-                    self.dbsession.bulk_insert_mappings(t_schema, values)
+                    self.dbsession.bulk_insert_mappings(mapper, values)
             else:
-                values = [t_schema(**value) for value in values]
+                values = [mapper(**value) for value in values]
                 if values:
                     self.dbsession.add_all(values)
         return self.dbsession

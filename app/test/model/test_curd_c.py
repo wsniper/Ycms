@@ -67,4 +67,5 @@ def test_curd_c_exc_table_not_exists(app_with_db_inited):
             dbsess, Table = curd.create(data)
             dbsess_01, Table_01 = curd.create(data_01)
 
-        dbsess_02 = curd.create(data_02)
+        with pytest.raises(exc.YcmsDBFieldNotExistsError):
+            dbsess_02 = curd.create(data_02)

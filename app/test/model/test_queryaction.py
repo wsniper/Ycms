@@ -1,6 +1,7 @@
 import pytest
 from sqlalchemy import text
 
+import app.exc as exc
 from app.db import get_dbsess
 from app.test import app_with_db_inited
 
@@ -33,12 +34,50 @@ def data():
             ]
         },
         'update': {
-            'dist_tables': ['roll'],
+            'dist_tables': ['roll'], #!!!仅允许具有一个元素的list/tuple/set 且 该元素必须是condition中引用的表
             'data': {'name': 'updated name', 'last_update_time': 9777777},
             'condition': [
                 [('roll.id', 'lt', 12), ('roll.id', 'gt', '7'), ('roll.name', 'like', '%h%')],
                 [('roll.name', 'like', '%a'), ('roll.id', 'lt', 6)]
             ]
+        },
+        'error_data':{
+            'create': {
+                'table_not_exists': {
+                    'some_table': []
+                },
+                # fields error
+                'fields_error': {
+                    'user': [{'a':1, 'b':2}]
+                }
+            },
+            'update': {
+                'table_not_exists': {
+                    'dist_tables': ['rollc'],
+                    'data': {'name': 'updated name', 'last_update_time': 9777777},
+                    'condition': [
+                        [('roll.id', 'lt', 12), ('roll.id', 'gt', '7'), ('roll.name', 'like', '%h%')],
+                        [('roll.name', 'like', '%a'), ('roll.id', 'lt', 6)]
+                    ]
+                },
+                # fields error
+                'fields_error': {
+                    'dist_tables': ['roll'],
+                    'data': {'name': 'updated name', 'last_update_time': 9777777},
+                    'condition': [
+                        [('some_other_table_may_make_fileds_error.id', 'lt', 12), ('roll.id', 'gt', '7'), ('roll.name', 'like', '%h%')],
+                        [('roll.name', 'like', '%a'), ('roll.id', 'lt', 6)]
+                    ]
+                },
+                'fields_error_2': {
+                    'dist_tables': ['roll'],
+                    'data': {'name': 'updated name', 'last_update_time': 9777777},
+                    'condition': [
+                        [('roll.wrong_field_not_in_table', 'lt', 12), ('roll.id', 'gt', '7'), ('roll.name', 'like', '%h%')],
+                        [('roll.wrong_field_not_in_table_2', 'like', '%a'), ('roll.id', 'lt', 6)]
+                    ]
+                },
+            },
         }
     }
     yield d
@@ -59,6 +98,37 @@ def test_create(app_with_db_inited, data):
             assert len(rs) == len(d['create'][t])
 
 
+
+def test_create_table_not_exists_error(app_with_db_inited, data):
+    """ 
+    """
+    d = data['error_data']['create']['table_not_exists']
+    with pytest.raises(exc.YcmsTableNotExistsError):
+        with app_with_db_inited.app_context():
+            dbsess = get_dbsess()
+            CreateAction(dbsess, d.keys(), TABLES, data=d).do()
+            for t in d.keys():
+                rs = dbsess.query(TABLES[t])\
+                        .filter(text('name in (%s)' %
+                                ','.join(['"' + row['name'] + '"' for row in d[t] ]))).all()
+
+                assert len(rs) == len(d[t])
+
+
+def test_create_fields_error(app_with_db_inited, data):
+    """ 仅 bulk=True 
+    """
+    d = data['error_data']['create']['fields_error']
+    with pytest.raises(exc.YcmsDBFieldNotExistsError):
+        with app_with_db_inited.app_context():
+            dbsess = get_dbsess()
+            CreateAction(dbsess, d.keys(), TABLES, bulk=True, data=d).do()
+            for t in d.keys():
+                rs = dbsess.query(TABLES[t]).all()
+                print(rs)
+
+
+
 # @pytest.mark.skip('zs')
 def test_update(app_with_db_inited, data):
     """ 根据条件update
@@ -71,3 +141,51 @@ def test_update(app_with_db_inited, data):
                      condition=d['condition'], data=d['data']).do()
 
 
+def test_update_when_exec_update_sqltable_not_exists_error(app_with_db_inited, data):
+    """ 
+    """
+    d = data['error_data']['update']['table_not_exists']
+
+    with pytest.raises(exc.YcmsTableNotExistsError):
+        with app_with_db_inited.app_context():
+            dbsess = get_dbsess()
+            UpdateAction(dbsess, dist_tables=d['dist_tables'],table_map_dict=TABLES, 
+                         condition=d['condition'], data=d['data']).do()
+
+
+
+def test_update_use_other_table_name_on_field_prefix_raise_when_parse_condition_fields_not_exitsts_error(app_with_db_inited, data):
+    """ 根据条件update
+    """
+    d = data['error_data']['update']['fields_error']
+
+    with pytest.raises(exc.YcmsSqlConditionParseError):
+        with app_with_db_inited.app_context():
+            dbsess = get_dbsess()
+            UpdateAction(dbsess, dist_tables=d['dist_tables'],table_map_dict=TABLES, 
+                         condition=d['condition'], data=d['data']).do()
+
+
+
+def test_update_use_wrong_field_name_of_right_table_raise_when_parse_condition_fields_not_exitsts_error(app_with_db_inited, data):
+    """ 根据条件update
+    """
+    d = data['error_data']['update']['fields_error_2']
+
+    with pytest.raises(exc.YcmsSqlConditionParseError):
+        with app_with_db_inited.app_context():
+            dbsess = get_dbsess()
+            UpdateAction(dbsess, dist_tables=d['dist_tables'],table_map_dict=TABLES, 
+                         condition=d['condition'], data=d['data']).do()
+
+
+def test_update_no_condition_error(app_with_db_inited, data):
+    """ 缺失condition 报异常 exc.YcmsDangerActionError 
+    """
+    d = data['update']
+
+    with pytest.raises(exc.YcmsDangerActionError):
+        with app_with_db_inited.app_context():
+            dbsess = get_dbsess()
+            UpdateAction(dbsess, dist_tables=d['dist_tables'],table_map_dict=TABLES, 
+                         condition=[], data=d['data']).do()
