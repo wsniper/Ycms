@@ -27,7 +27,7 @@ class ParseSqlMixIn:
         """
         self.splitor = getattr(self, 'splitor', '')
         val = str(val)
-        rs = (''.join(['"', val, '"']), False)
+        rs = (val, False)
         t_map = None
         t_map_f = None
         if (val.count('.') == 1 and val.startswith(self.splitor) and 
