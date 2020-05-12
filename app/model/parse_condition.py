@@ -200,7 +200,7 @@ class ParseOrderBy(ParseSqlMixIn):
     """ 解析orderby
     """
     def __init__(self, src, table_map_dict=None):
-        self.src = src 
+        self.src = src or [] 
         self.fn = {'asc': asc, 'desc': desc}
         self.table_map_dict = table_map_dict or TABLES
 
@@ -224,7 +224,7 @@ class ParseFields(ParseSqlMixIn):
         :return: text('f, f, f, f')
     """
     def __init__(self, src, table_map_dict=None):
-        self.src = src
+        self.src = src or []
         self.table_map_dict = table_map_dict or TABLES
 
     def parse(self):
@@ -241,7 +241,7 @@ class ParseLimit(ParseSqlMixIn):
 
             :param src: 逗号分隔的正整数
         """
-        self.src = src
+        self.src = src or '0,10'
 
     def parse(self):
         """
@@ -262,7 +262,7 @@ class ParseGroupBy(ParseSqlMixIn):
             :param src: 带解析字符串
                 eg: table.field$sum|table.field,avg|table.field
         """
-        self.src = src
+        self.src = src or ''
         self.sql_fn_white_list = ('sum', 'count', 'avg', 'max', 'min')
         self.table_map_dict = table_map_dict or TABLES
 

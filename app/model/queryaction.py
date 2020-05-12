@@ -16,7 +16,7 @@ from .parse_condition import (
 
 class BaseAction:
     def __init__(self, dbsession, dist_tables, table_map_dict, 
-                      condition, order_by_str='', group_by_str='', limit_str='', data=None):
+                      condition=None, fields=None, order_by_str='', group_by_str='', limit_str='', data=None):
         """ 数据库操作（URD）基类
 
             组装sqlalchemy.Query
@@ -25,7 +25,8 @@ class BaseAction:
         """
         self.dbsession = dbsession
         self.dist_tables = dist_tables
-        self.table_map_dict = table_map_dict or TABLES
+        self.table_map_dict = table_map_dict
+        self.fields = fields
         self.condition =condition
         self.order_by_str = order_by_str
         self.group_by_str = group_by_str
@@ -57,16 +58,14 @@ class BaseAction:
             TODO 需要将解析异常全部包裹 并抛出自定义异常 具体是从这里还是各个解析器做 待定
         """
         query = self.dbsession.query(*self.get_dist_table_map())
+        fields = ParseFields(self.fields)
         where = ParseCondition(self.condition)
         params = where.params
         where = where.parse()
         order_by = ParseOrderBy(self.order_by_str).parse()
         group_by = ParseGroupBy(self.group_by_str).parse()
         offset, limit = ParseLimit(self.limit_str).parse()
-        print('\n\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\')
-        print(where, params)
-        print('\n\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\')
-        # !!! 不能直接使用if where  因为其未sqlalchemy.text且未实现预期的 __bool__
+        # !!! 不能直接使用if where/order_by/group_by  因为其未sqlalchemy.text且未实现预期的 __bool__
         if str(where): 
             query = query.filter(where)
             if params:
