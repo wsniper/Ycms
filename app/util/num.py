@@ -10,7 +10,7 @@ def parse_int_or_zero(arg):
 
 def parse_int_or_zero_unsigned(arg):
     try:
-        return int(str(arg)) > 0 or 0
+        return int(str(arg)) if int(str(arg)) > 0 else 0
     except ValueError as e:
         return 0
 
