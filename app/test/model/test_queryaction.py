@@ -78,10 +78,12 @@ def data():
         'list': {
             'dist_tables': ['roll'],
             'condition': [
-                [('roll.id', 'like', '%2')],
-                []
+                # [('roll.id', 'like', '%2')],
+                [('roll.id', 'lt', '99'), ]
             ],
-            'order_by': [('roll.id', 'desc')] 
+            'limit': '3,3',
+            'fields': ['roll.id', 'roll.name'],
+            'order_by': [('roll.id', 'desc'), ('roll.name', 'asc')] 
         },
         'error_data':{
             'create': {
@@ -297,9 +299,16 @@ def test_list(app_with_db_inited, data, create_some_row):
     with app_with_db_inited.app_context():
         d = data['list']
         dbsess = get_dbsess()
-        rs = ListAction(dbsess, table_map_dict=TABLES, dist_tables=d['dist_tables'],order_by=d['order_by']).do()
+        rs = ListAction(dbsess, table_map_dict=TABLES, dist_tables=d['dist_tables'],
+                        condition=d['condition'], order_by=d['order_by'],
+                        fields=d['fields'], limit=d['limit']).do()
         print(rs)
 
-        
-
-
+# @pytest.mark.skipif(skip_all, reason='just skip it')
+def test_one(app_with_db_inited, data, create_some_row):
+    with app_with_db_inited.app_context():
+        d = data['list']
+        dbsess = get_dbsess()
+        rs = OneAction(dbsess, table_map_dict=TABLES, dist_tables=d['dist_tables'],
+                        condition=d['condition'], fields=d['fields']).do()
+        print([rs.name, rs.id])

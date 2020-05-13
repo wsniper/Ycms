@@ -19,7 +19,7 @@ from ..logger import dlogger
 
 
 class ParseSqlMixIn:
-    def get_map_attr_or_val(self, val, is_field=False, parse_field_with_no_flag_char=False):
+    def get_map_attr_or_val(self, val, is_field=False, return_field_obj=False, parse_field_with_no_flag_char=False):
         """ 将val 解析为数据库字段（返回值第二个布尔值标示）或普通字符串
 
             :param parse_field_with_no_flag_char: 不带也按照字段名解析
@@ -39,7 +39,10 @@ class ParseSqlMixIn:
                 raise exc.YcmsSqlConditionParseError('字段不存在 <' + t_name + '.' + f_name + '>')
 
         if all([t_map, t_map_f]):
-            rs = ('.'.join([t_name, f_name]), True)
+            if return_field_obj:
+                rs = t_map_f, True
+            else:
+                rs = ('.'.join([t_name, f_name]), True)
         elif is_field:
             raise exc.YcmsSqlConditionParseError(val)
         return rs
@@ -96,7 +99,7 @@ class ParseCondition(ParseSqlMixIn):
                 eg: ('user.name', 'like', '%adf')
                     ('user.age', 'eq', 'user.id')
         """
-        left = self.get_map_attr_or_val(tuple_str[0], True, True)
+        left = self.get_map_attr_or_val(tuple_str[0], True, False, True)
         right = self.get_map_attr_or_val(tuple_str[2])
 
         op = tuple_str[1]
@@ -237,9 +240,9 @@ class ParseFields(ParseSqlMixIn):
     def parse(self):
         rs = []
         for item in self.src:
-            field = self.get_map_attr_or_val(item, True, True)
+            field = self.get_map_attr_or_val(item, True, True,  True)
             rs.append(field[0])
-        return text(', '.join(rs))
+        return rs
 
 
 class ParseLimit(ParseSqlMixIn):
@@ -279,7 +282,7 @@ class ParseGroupBy(ParseSqlMixIn):
         if not self.src:
             return ''
         tmp = self.src.split('$')
-        by_field = self.get_map_attr_or_val(tmp[0], True, True)[0]
+        by_field = self.get_map_attr_or_val(tmp[0], True, False, True)[0]
         fn_strs = []
         if len(tmp) > 1:
             fn_fields = [item.split('|') for item in tmp[1].split(',')]
@@ -287,7 +290,7 @@ class ParseGroupBy(ParseSqlMixIn):
                 fn, field = item
                 if fn not in self.sql_fn_white_list:
                     raise exc.YcmsSqlConditionParseError('group by 禁止使用该函数<' + fn + '>')
-                field = self.get_map_attr_or_val(field, True, True)
+                field = self.get_map_attr_or_val(field, True, False, True)
                 if not field[1]:
                     raise exc.YcmsSqlConditionParseError(
                         '字段不存在 <' + field[0] + '>'

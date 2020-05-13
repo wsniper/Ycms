@@ -79,12 +79,14 @@ class BaseAction:
             TODO 需要将解析异常全部包裹 并抛出自定义异常 具体是从这里还是各个解析器做 待定
         """
         query = self.dbsession.query(*self.get_dist_table_map())
-        fields = ParseFields(self.fields)
+        fields = ParseFields(self.fields, self.table_map_dict).parse()
+        if fields:
+            query = query.with_entities(*fields)
 
         where = ParseCondition(self.condition, self.table_map_dict)
         params = where.params
         where = where.parse()
-        order_by = ParseOrderBy(self.order_by_list).parse()
+        order_by = ParseOrderBy(self.order_by_list, self.table_map_dict).parse()
         group_by = ParseGroupBy(self.group_by_str).parse()
         offset, limit = ParseLimit(self.limit_str).parse()
         # !!! 不能直接使用if where/order_by/group_by  因为其未sqlalchemy.text且未实现预期的 __bool__
@@ -95,7 +97,7 @@ class BaseAction:
         elif self.action_name in ('update', 'delete'):
             raise exc.YcmsDangerActionError('数据库危险操作! <%s，必须限定条件(需要where子句)>' % self.action_name)
         if self.action_name in ('list', 'one') and order_by:
-            query = query.order_by(text(order_by))
+            query = query.order_by(*order_by)
         if self.action_name in ('list', 'one') and  str(group_by):
             query = query.group_by(group_by)
         if self.action_name in ('list', 'one') and  limit:
@@ -192,16 +194,16 @@ class ListAction(BaseAction):
             .group_by(group_by).offset(offset).limit(limit).all()
     """
     def __init__(self, dbsession, dist_tables, table_map_dict, 
-                      condition=None, fields=None,  order_by=None, group_by_str='', limit_str='', data=None):
+                      condition=None, fields=None,  order_by=None, group_by_str='', limit=''):
         self.action_name = 'list'
         super().__init__(dbsession, dist_tables, table_map_dict, 
-                         condition, fields, order_by, group_by_str, limit_str)
+                         condition, fields, order_by, group_by_str, limit)
 
     def do(self):
         return self.query().all()
 
 
-class OneAction(BaseAction):
+class OneAction(ListAction):
     """ 取一条信息
         one()  
             结果不是一个会抛异常
@@ -219,11 +221,11 @@ class OneAction(BaseAction):
         dbsess.query(tableMap).fileds(fields).filter(where).order_by(order_by)\
             .group_by(group_by).offset(offset).limit(limit).one()
     """
-    def __init__(self, dbsession, dist_tables, table_map_dict, 
-                      condition, fields=None,  order_by=None, group_by_str='', limit_str='', data=None):
+    def __init__(self, dbsession, dist_tables, table_map_dict, condition=None, fields=None):
         self.action_name = 'one'
         super().__init__(dbsession, dist_tables, table_map_dict, 
-                         condition, fields, order_by, group_by_str, '0,1')
+                      condition, fields, None, None, '0,1')
 
     def do(self):
-        return self.query().all()
+        rs = super().do()
+        return rs[0] if rs else None
