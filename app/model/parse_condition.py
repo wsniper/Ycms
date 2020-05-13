@@ -248,18 +248,18 @@ class ParseLimit(ParseSqlMixIn):
 
             :param src: 逗号分隔的正整数
         """
-        self.src = src or '0,10'
+        self.src = src or '0,9999999'
 
     def parse(self):
         """
         """
         offset = 0
-        limit = 10
+        limit = 9999999
         if self.src:
             offset, limit = [num.parse_int_or_zero_unsigned(str(i).replace(' ', '')) 
                                  for i in str(self.src).split(',')]
 
-        limit = limit if limit > 0  else 10
+        limit = limit if limit > 0  else 9999999
         return offset, limit
 
 

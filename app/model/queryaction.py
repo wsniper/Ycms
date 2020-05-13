@@ -16,7 +16,7 @@ from .parse_condition import (
 
 class BaseAction:
     def __init__(self, dbsession, dist_tables, table_map_dict, 
-                      condition=None, fields=None, order_by_str='', group_by_str='', limit_str='', data=None):
+                      condition=None, fields=None, order_by_list=None, group_by_str='', limit_str='', data=None):
         """ 数据库操作（URD）基类
 
             组装sqlalchemy.Query
@@ -28,7 +28,7 @@ class BaseAction:
         self.table_map_dict = table_map_dict
         self.fields = fields
         self.condition =condition
-        self.order_by_str = order_by_str
+        self.order_by_list = order_by_list
         self.group_by_str = group_by_str
         self.limit_str = limit_str
         self.data = data 
@@ -80,10 +80,11 @@ class BaseAction:
         """
         query = self.dbsession.query(*self.get_dist_table_map())
         fields = ParseFields(self.fields)
+
         where = ParseCondition(self.condition, self.table_map_dict)
         params = where.params
         where = where.parse()
-        order_by = ParseOrderBy(self.order_by_str).parse()
+        order_by = ParseOrderBy(self.order_by_list).parse()
         group_by = ParseGroupBy(self.group_by_str).parse()
         offset, limit = ParseLimit(self.limit_str).parse()
         # !!! 不能直接使用if where/order_by/group_by  因为其未sqlalchemy.text且未实现预期的 __bool__
@@ -93,8 +94,8 @@ class BaseAction:
                 query = query.params(**params)
         elif self.action_name in ('update', 'delete'):
             raise exc.YcmsDangerActionError('数据库危险操作! <%s，必须限定条件(需要where子句)>' % self.action_name)
-        if self.action_name in ('list', 'one') and str(order_by):
-            query = query.order_by(order_by)
+        if self.action_name in ('list', 'one') and order_by:
+            query = query.order_by(text(order_by))
         if self.action_name in ('list', 'one') and  str(group_by):
             query = query.group_by(group_by)
         if self.action_name in ('list', 'one') and  limit:
@@ -105,16 +106,14 @@ class BaseAction:
 class CreateAction(BaseAction):
     """ (批量)新增数据
     """
-    def __init__(self, dbsession, dist_tables, table_map_dict, 
-                  condition=None, fields=None, order_by_str='', group_by_str='', limit_str='', data=None, bulk=True):
+    def __init__(self, dbsession, dist_tables, table_map_dict, data=None, bulk=True):
         """
             :param buld: 是否使用sqlalchem的 bulk_insert_mappings
             其他param参加 BaseAction
         """
         self.bulk = bulk
         self.action_name = 'create'
-        super().__init__(dbsession, dist_tables, table_map_dict, 
-                         condition, fields, order_by_str, group_by_str, limit_str, data)
+        super().__init__(dbsession, dist_tables, table_map_dict, None, None, None, None, None, data)
 
 
 
@@ -146,8 +145,7 @@ class UpdateAction(BaseAction):
         !!! 没有 condition（filter）直接不能操作。防止误改全表
         dbsess.query(tableMap).filter(where).update(data)
     """
-    def __init__(self, dbsession, dist_tables, table_map_dict, condition, 
-                 fields=None, order_by_str='', group_by_str='', limit_str='', data=None, bulk=True):
+    def __init__(self, dbsession, dist_tables, table_map_dict, condition, data=None, bulk=True):
         self.action_name = 'update'
         self.bulk = bulk
         super().__init__(dbsession, dist_tables, table_map_dict, 
@@ -179,11 +177,10 @@ class DeleteAction(BaseAction):
         !!! 没有 condition（filter）直接不能操作。防止误删全表
         dbsess.query(tableMap).filter(where).update(data)
     """
-    def __init__(self, dbsession, dist_tables, table_map_dict, 
-                      condition, fields=None, order_by_str='', group_by_str='', limit_str='', data=None):
+    def __init__(self, dbsession, dist_tables, table_map_dict, condition):
         self.action_name = 'delete'
         super().__init__(dbsession, dist_tables, table_map_dict, 
-                         condition, None, None, None, None, data)
+                         condition, None, None, None, None, None)
 
     def do(self):
         return  self.query().delete(synchronize_session=False)
@@ -195,10 +192,10 @@ class ListAction(BaseAction):
             .group_by(group_by).offset(offset).limit(limit).all()
     """
     def __init__(self, dbsession, dist_tables, table_map_dict, 
-                      condition, fields=None,  order_by_str='', group_by_str='', limit_str='', data=None):
+                      condition=None, fields=None,  order_by=None, group_by_str='', limit_str='', data=None):
         self.action_name = 'list'
         super().__init__(dbsession, dist_tables, table_map_dict, 
-                         condition, feilds, order_by_str, group_by_str, limit_str)
+                         condition, fields, order_by, group_by_str, limit_str)
 
     def do(self):
         return self.query().all()
@@ -223,10 +220,10 @@ class OneAction(BaseAction):
             .group_by(group_by).offset(offset).limit(limit).one()
     """
     def __init__(self, dbsession, dist_tables, table_map_dict, 
-                      condition, fields=None,  order_by_str='', group_by_str='', limit_str='', data=None):
+                      condition, fields=None,  order_by=None, group_by_str='', limit_str='', data=None):
         self.action_name = 'one'
         super().__init__(dbsession, dist_tables, table_map_dict, 
-                         condition, feilds, order_by_str, group_by_str, '0,1')
+                         condition, fields, order_by, group_by_str, '0,1')
 
     def do(self):
         return self.query().all()

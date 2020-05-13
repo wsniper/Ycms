@@ -10,6 +10,14 @@ from app.model.queryaction import (CreateAction, UpdateAction, DeleteAction, Lis
 
 
 skip_all = True
+@pytest.fixture
+def create_some_row(app_with_db_inited, data):
+    with app_with_db_inited.app_context():
+        dbsess = get_dbsess()
+        CreateAction(dbsess, data['create'].keys(), TABLES, data=data['create']).do()
+        dbsess.commit()
+        return dbsess
+
 
 @pytest.fixture
 def data():
@@ -66,6 +74,14 @@ def data():
             'condition': [
                 [('roll.id', 'between', '8_@$@_11')],
             ]
+        },
+        'list': {
+            'dist_tables': ['roll'],
+            'condition': [
+                [('roll.id', 'like', '%2')],
+                []
+            ],
+            'order_by': [('roll.id', 'desc')] 
         },
         'error_data':{
             'create': {
@@ -224,7 +240,7 @@ def test_update_no_condition_error(app_with_db_inited, data):
                          condition=[], data=d['data']).do()
 
 
-# @pytest.mark.skipif(skip_all, reason='just skip it')
+@pytest.mark.skipif(skip_all, reason='just skip it')
 def test_delete(app_with_db_inited, data):
     """ 删除
     """
@@ -274,4 +290,16 @@ def test_delete(app_with_db_inited, data):
                             ).all():
             ids.append(row[0])
         assert ids == [2, 5, 6, 7]
+
+
+# @pytest.mark.skipif(skip_all, reason='just skip it')
+def test_list(app_with_db_inited, data, create_some_row):
+    with app_with_db_inited.app_context():
+        d = data['list']
+        dbsess = get_dbsess()
+        rs = ListAction(dbsess, table_map_dict=TABLES, dist_tables=d['dist_tables'],order_by=d['order_by']).do()
+        print(rs)
+
+        
+
 
