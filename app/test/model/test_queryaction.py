@@ -9,6 +9,8 @@ from app.schema import TABLES
 from app.model.queryaction import (CreateAction, UpdateAction, DeleteAction, ListAction, OneAction)
 
 
+skip_all = True
+
 @pytest.fixture
 def data():
     d = {
@@ -50,7 +52,7 @@ def data():
         'delete_2':{
             'dist_tables': ['roll'], #!!!仅允许具有一个元素的list/tuple/set 且 该元素必须是condition中引用的表
             'condition': [
-                [('roll.name', 'like', '%a%a')],
+                [('roll.name', 'like', '%aa')],
             ]
         },
         'delete_3':{
@@ -62,7 +64,7 @@ def data():
         'delete_4':{
             'dist_tables': ['roll'], #!!!仅允许具有一个元素的list/tuple/set 且 该元素必须是condition中引用的表
             'condition': [
-                [('roll.id', 'between', 'a_@$@_b')],
+                [('roll.id', 'between', '8_@$@_11')],
             ]
         },
         'error_data':{
@@ -107,7 +109,7 @@ def data():
     yield d
 
 
-@pytest.mark.skip('sdf')
+@pytest.mark.skipif(skip_all, reason='just skip it')
 def test_create(app_with_db_inited, data):
     """
     """
@@ -124,7 +126,7 @@ def test_create(app_with_db_inited, data):
 
 
 
-@pytest.mark.skip('sdf')
+@pytest.mark.skipif(skip_all, reason='just skip it')
 def test_create_table_not_exists_error(app_with_db_inited, data):
     """ 
     """
@@ -141,7 +143,7 @@ def test_create_table_not_exists_error(app_with_db_inited, data):
                 assert len(rs) == len(d[t])
 
 
-@pytest.mark.skip('sdf')
+@pytest.mark.skipif(skip_all, reason='just skip it')
 def test_create_fields_error(app_with_db_inited, data):
     """ 仅 bulk=True 
     """
@@ -156,8 +158,7 @@ def test_create_fields_error(app_with_db_inited, data):
 
 
 
-# @pytest.mark.skip('zs')
-@pytest.mark.skip('sdf')
+@pytest.mark.skipif(skip_all, reason='just skip it')
 def test_update(app_with_db_inited, data):
     """ 根据条件update
     """
@@ -169,7 +170,7 @@ def test_update(app_with_db_inited, data):
                      condition=d['condition'], data=d['data']).do()
 
 
-@pytest.mark.skip('sdf')
+@pytest.mark.skipif(skip_all, reason='just skip it')
 def test_update_when_exec_update_sqltable_not_exists_error(app_with_db_inited, data):
     """ 
     """
@@ -183,7 +184,7 @@ def test_update_when_exec_update_sqltable_not_exists_error(app_with_db_inited, d
 
 
 
-@pytest.mark.skip('sdf')
+@pytest.mark.skipif(skip_all, reason='just skip it')
 def test_update_use_other_table_name_on_field_prefix_raise_when_parse_condition_fields_not_exitsts_error(app_with_db_inited, data):
     """ 根据条件update
     """
@@ -197,7 +198,7 @@ def test_update_use_other_table_name_on_field_prefix_raise_when_parse_condition_
 
 
 
-@pytest.mark.skip('sdf')
+@pytest.mark.skipif(skip_all, reason='just skip it')
 def test_update_use_wrong_field_name_of_right_table_raise_when_parse_condition_fields_not_exitsts_error(app_with_db_inited, data):
     """ 根据条件update
     """
@@ -210,7 +211,7 @@ def test_update_use_wrong_field_name_of_right_table_raise_when_parse_condition_f
                          condition=d['condition'], data=d['data']).do()
 
 
-@pytest.mark.skip('sdf')
+@pytest.mark.skipif(skip_all, reason='just skip it')
 def test_update_no_condition_error(app_with_db_inited, data):
     """ 缺失condition 报异常 exc.YcmsDangerActionError 
     """
@@ -223,6 +224,7 @@ def test_update_no_condition_error(app_with_db_inited, data):
                          condition=[], data=d['data']).do()
 
 
+# @pytest.mark.skipif(skip_all, reason='just skip it')
 def test_delete(app_with_db_inited, data):
     """ 删除
     """
@@ -236,16 +238,40 @@ def test_delete(app_with_db_inited, data):
         dbsess.commit()
         DeleteAction(dbsess, dist_tables=d['dist_tables'],table_map_dict=TABLES, 
                      condition=d['condition']).do()
+        dbsess.commit()
+        ids = []
+        for row in dbsess.query(TABLES[d['dist_tables'][0]]).with_entities(
+                                TABLES[d['dist_tables'][0]].id, TABLES[d['dist_tables'][0]].name
+                            ).all():
+            ids.append(row[0])
+            print(row)
+        assert ids == [1, 2, 5, 6, 7, 8, 9]
         DeleteAction(dbsess, dist_tables=d_2['dist_tables'],table_map_dict=TABLES, 
                      condition=d_2['condition']).do()
+        dbsess.commit()
+        ids = []
+        for row in dbsess.query(TABLES[d['dist_tables'][0]]).with_entities(
+                                TABLES[d['dist_tables'][0]].id, TABLES[d['dist_tables'][0]].name
+                            ).all():
+            ids.append(row[0])
+        assert len(ids) == 6 and ids == [2, 5, 6, 7, 8, 9]
         DeleteAction(dbsess, dist_tables=d_3['dist_tables'],table_map_dict=TABLES, 
                      condition=d_3['condition']).do()
+        dbsess.commit()
+        ids = []
+        for row in dbsess.query(TABLES[d['dist_tables'][0]]).with_entities(
+                                TABLES[d['dist_tables'][0]].id, TABLES[d['dist_tables'][0]].name
+                            ).all():
+            ids.append(row[0])
+        assert len(ids) == 6 and ids == [2, 5, 6, 7, 8, 9]
         DeleteAction(dbsess, dist_tables=d_4['dist_tables'],table_map_dict=TABLES, 
                      condition=d_4['condition']).do()
         dbsess.commit()
 
+        ids = []
         for row in dbsess.query(TABLES[d['dist_tables'][0]]).with_entities(
                                 TABLES[d['dist_tables'][0]].id, TABLES[d['dist_tables'][0]].name
                             ).all():
-            print(row)
+            ids.append(row[0])
+        assert ids == [2, 5, 6, 7]
 
