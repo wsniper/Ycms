@@ -1,4 +1,5 @@
 from os import path
+from ..conf import config
 
 conf = {
     'version': 1,
@@ -22,13 +23,25 @@ conf = {
             'mode': 'a',
             'maxBytes': 99999,
             'backupCount': 999999999
+        },
+        'error_handler': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': config.EXC.log_path, 
+            'formatter': 'default',
+            'mode': 'a',
+            'maxBytes': 99999,
+            'backupCount': 999999999
         }
     },
     'loggers': {
         'debug': {
             'level': 'DEBUG',
             'handlers': ['debug_handler']
-        }
+        },
+        'debug': {
+            'level': 'ERROR',
+            'handlers': ['error_handler']
+        },
     },
     'default': {
         'level': 'INFO',
