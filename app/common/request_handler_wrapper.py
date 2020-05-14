@@ -1,3 +1,5 @@
+import logging
+import functools
 """ 通用的请求handler的装饰器
 
     直接将返回前端的数据格式封装。无论请求成功或失败都可返回下面数据格式
@@ -21,6 +23,8 @@ def get_exc_info_customized(e, exc_list):
             info = ['', 500, None] if not info else info
             info.extend([500, None]) if len(info) == 1 else None
             info.append(None) if len(info) == 2 else None
+            # ycms_message  
+            info[0] = info[0] if info[0] else getattr(e, 'ycms_message', None)
     return info
 
 
@@ -72,7 +76,6 @@ def wrapper(exc_list=None, response_status_code=200, catch_all_exc=True, logit=T
                 """ 处理 返回错误信息 可返回给前端的
                 """
                 exc_message, response_status_code, redirect_url = get_exc_info_customized(e, exc_list)
-                exc_message = exc_message if exc_message else getattr(e, 'message', None)
                 exc_message = exc_message if exc_message else '未知错误'
                 resp['status'] = 'ERROR'
                 resp['message'] = exc_message 
