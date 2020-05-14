@@ -1,5 +1,6 @@
 import logging
 import functools
+from flask import redirect
 """ 通用的请求handler的装饰器
 
     直接将返回前端的数据格式封装。无论请求成功或失败都可返回下面数据格式
