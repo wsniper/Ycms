@@ -1,10 +1,15 @@
 """ Ycms 异常
 """
+from sqlalchemy.exc import SQLAlchemyError
+import pydantic
+from pydantic import (PydanticTypeError, PydanticValueError)
 
 
 class YcmsError(Exception):
     def __init__(self, message, data='', logit=False):
         self.message = message
+        self.ycms_message = message
+
         self.data = data
 
     def __repr__(self):
@@ -13,6 +18,35 @@ class YcmsError(Exception):
                     message=self.message,
                     data=str(self.data)
                 )
+
+
+
+class YFileNotFound(YcmsError, FileNotFoundError):
+    def __init__(self, message='找不到文件'):
+        self.message = message
+        self.ycms_message = message
+
+
+class YKeyError(YcmsError, KeyError):
+    def __init__(self, message='键错误'):
+        self.message = message
+        self.ycms_message = message
+
+
+
+class YValueError(YcmsError, ValueError):
+    def __init__(self, message='值错误'):
+        self.message = message
+        self.ycms_message = message
+
+
+
+class YPydanticValidateError(PydanticTypeError, PydanticValueError):
+    def __init__(self, message='数据验证未通过'):
+        self.message = message
+        self.ycms_message = message
+
+        self.engine = 'pydantic'
 
 
 class YcmsDBError(YcmsError):
@@ -25,6 +59,13 @@ class YcmsDBError(YcmsError):
     def __init__(self, message, data='', logit=False):
         message = message or '数据库操作失败: ' + str(data)
         super().__init__(message, data, logit)
+
+
+class YSqlalchemyError(YcmsDBError, SQLAlchemyError):
+    def __init__(self, message='数据库操作失败'):
+        self.message = message
+        self.ycms_message = message
+
 
 
 class YcmsDBFieldNotExistsError(YcmsDBError):
