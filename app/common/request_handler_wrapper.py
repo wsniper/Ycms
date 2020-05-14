@@ -24,7 +24,7 @@ def get_exc_info_customized(e, exc_list):
     return info
 
 
-def exc_catcher(exc_list=None, response_status_code=200, catch_all_exc=True, logit=True):
+def wrapper(exc_list=None, response_status_code=200, catch_all_exc=True, logit=True):
     """ 通用的请求handler的装饰器
         
         传入预期需要捕获的异常列表。
