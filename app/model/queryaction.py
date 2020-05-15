@@ -75,14 +75,11 @@ class BaseAction:
     def query(self):
         """ 组装sqlalchemy 查询语句
 
-            TODO 缺少fields解析
-            TODO 需要将解析异常全部包裹 并抛出自定义异常 具体是从这里还是各个解析器做 待定
         """
         query = self.dbsession.query(*self.get_dist_table_map())
         fields = ParseFields(self.fields, self.table_map_dict).parse()
         if fields:
             query = query.with_entities(*fields)
-
         where = ParseCondition(self.condition, self.table_map_dict)
         params = where.params
         where = where.parse()
@@ -229,3 +226,99 @@ class OneAction(ListAction):
     def do(self):
         rs = super().do()
         return rs[0] if rs else None
+
+
+class DBAction:
+    """ 再次封装CURD 简化公共参数传递
+
+        将必填参数 dbsession / dist_tables / table_map_dict 放到类初始化时传入
+        这样，若一个逻辑单元（函数/方法等）使用相同的上述三个公共参数时可实例化
+        （传入一次上述参数）后直接使用实例来简化输入，专注业务逻辑
+    """
+    def __init__(self, dbsession, dist_tables, table_map_dict):
+        self.dbsession = dbsession 
+        self.dist_tables = dist_tables
+        self.table_map_dict = table_map_dict
+
+    def create(self, data, bulk=False):
+        """ 单条添加
+
+            :param data: 需要添加的数据 dict() or [[dict]]
+        """
+        if isinstance(data, dict):
+            data = [[data]]
+        return CreateAction(
+            self.dbsession,
+            self.dist_tables,
+            self.table_map_dict,
+            data=data,
+            bulk=bulk
+        ).do()
+
+
+    def create_all(self, data, bulk=False):
+        """ 批量添加
+            
+            :return: self.dbsession
+        """
+        return CreateAction(
+            self.dbsession,
+            self.dist_tables,
+            self.table_map_dict,
+            data=data,
+            bulk=bulk
+        ).do()
+
+    def update(self, condition, data, bulk=False):
+        """ 根据条件更新
+            
+            :return: self.dbsession
+        """
+        return UpdateAction(
+            self.dbsession,
+            self.dist_tables,
+            self.table_map_dict,
+            condition=condition,
+            data=data,
+            bulk=bulk
+        ).do()
+
+    def delete(self, condidtion):
+        return DeleteAction(
+            self.dbsession,
+            self.dist_tables,
+            self.table_map_dict,
+            condition=condition
+        ).do()
+
+    def list(self, fields=None, condition=None, order_by=None, group_by=None, limit=''):
+        """ 取多条记录
+
+            :return: list[mapper] or empty list[]
+        """
+        return ListAction(
+            self.dbsession,
+            self.dist_tables,
+            self.table_map_dict,
+            fields=fields,
+            condition=condition,
+            order_by=order_by,
+            group_by=group_by,
+            limit=limit
+        ).do()
+
+    def one(self, fields=None, condition=None, order_by=None, group_by=None, limit=''):
+        """ 取一条记录
+
+            :return: sqlalchemy table mapper  or None
+        """
+        return OneAction(
+            self.dbsession,
+            self.dist_tables,
+            self.table_map_dict,
+            fields=fields,
+            condition=condition,
+            order_by=order_by,
+            group_by=group_by,
+            limit=limit
+        ).do()
