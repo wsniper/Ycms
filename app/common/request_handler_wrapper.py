@@ -57,7 +57,8 @@ def wrapper(exc_list=None, response_status_code=200, catch_all_exc=True, logit=T
         def inner(*arg, **kwarg):
             resp = {
                 'status': 'SUCCESS',
-                'data': None
+                'data': None,
+                'errors': None,
             }
             response_status_code = 200
             try:

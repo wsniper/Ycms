@@ -240,13 +240,13 @@ class DBAction:
         self.dist_tables = dist_tables
         self.table_map_dict = table_map_dict
 
-    def create(self, data, bulk=False):
+    def create(self, table, data, bulk=False):
         """ 单条添加
 
             :param data: 需要添加的数据 dict() or [[dict]]
         """
-        if isinstance(data, dict):
-            data = [[data]]
+        if all([table, isinstance(data, dict)]):
+            data = {table: [data]}
         return CreateAction(
             self.dbsession,
             self.dist_tables,
@@ -317,8 +317,5 @@ class DBAction:
             self.dist_tables,
             self.table_map_dict,
             fields=fields,
-            condition=condition,
-            order_by=order_by,
-            group_by=group_by,
-            limit=limit
+            condition=condition
         ).do()
